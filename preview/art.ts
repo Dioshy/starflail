@@ -49,6 +49,9 @@ function gallery(t: number) {
     label(c, st, 30, y + 44 + r * 70);
   });
   y += 230;
+  head(c, 'world telegraphs (looping prog): dart / wisp / brute / spitter / eclipse blink', y);
+  telegraphDemo(c, t, y + 20);
+  y += 130;
   head(c, 'bosses: idle / telegraph / attack', y);
   BOSSES.forEach((id, b) => STATES.forEach((st, r) => {
     const x = 70 + b * 370 + r * 118, yy = y + 90;
@@ -78,6 +81,22 @@ function gallery(t: number) {
   A.drawFloatingText(c, '42', 560, y + 36, 1, 'dmg'); A.drawFloatingText(c, '128!', 620, y + 36, 1, 'crit');
   A.drawFloatingText(c, '+5', 690, y + 36, 1, 'heal'); A.drawFloatingText(c, 'LEVEL UP', 770, y + 36, 1, 'info');
   A.drawLogo(c, 930, y + 36, 0.6, t);
+}
+
+const TP: Record<string, number> = { dashSpeed: 600, dashSec: 0.25, lungeSpeed: 400, lungeSec: 0.3, chargeSpeed: 500, chargeSec: 0.3, blinkRadius: 70, ringCount: 12, phase2RingCount: 16, volleySpreadDeg: 40, spiralArms: 3, wellRadius: 100 };
+function telegraphDemo(c: CanvasRenderingContext2D, t: number, y: number) {
+  const prog = (t % 1) / 1;
+  const base = { phase2: false, state: 1 as const, tx: 0, ty: 0, prog, t, params: { ...TP, dashSpeed: 260, lungeSpeed: 160, chargeSpeed: 200 } };
+  const items: Array<[string, number, number]> = [['dart', 16, 0], ['wisp', 16, 0], ['brute', 24, 0], ['spitter', 16, 0]];
+  items.forEach(([k, r], i) => {
+    const x = 80 + i * 200, yy = y + 50;
+    A.drawTelegraph(c, { ...base, kind: k, pat: 0, x, y: yy, radius: r, dirX: 1, dirY: 0 });
+    A.drawEnemy(c, k, x, yy, r, 0, t, 0, 'telegraph');
+  });
+  const ex = 900, ey = y + 50;
+  A.drawTelegraph(c, { ...base, kind: 'eclipse', pat: 1, x: 880, y: ey, radius: 30, dirX: 1, dirY: 0, tx: 1010, ty: ey + 10 });
+  A.drawEnemy(c, 'eclipse', 880, ey, 30, 0, t, 0, 'telegraph');
+  void ex;
 }
 
 function stressScene(t: number) {
