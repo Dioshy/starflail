@@ -4,9 +4,9 @@ import type { DirectorDef, EventDef, WaveDef } from './types';
 // Sawtooth pacing: ramp -> boss (breather wave) -> higher ramp. Waves are contiguous [fromSec, toSec).
 
 export const WAVES: WaveDef[] = [
-  { fromSec: 0, toSec: 30, spawnPerSec: 0.8, maxAlive: 20, hpMul: 1.0,
+  { fromSec: 0, toSec: 30, spawnPerSec: 0.6, maxAlive: 20, hpMul: 1.0,
     mix: [{ enemy: 'mite', weight: 1 }], note: 'Teach: swing the orb into chasers.' },
-  { fromSec: 30, toSec: 60, spawnPerSec: 1.2, maxAlive: 30, hpMul: 1.0,
+  { fromSec: 30, toSec: 60, spawnPerSec: 0.9, maxAlive: 30, hpMul: 1.0,
     mix: [{ enemy: 'mite', weight: 3 }, { enemy: 'dart', weight: 1 }], note: 'Teach: dodge a telegraphed dash.' },
   { fromSec: 60, toSec: 120, spawnPerSec: 1.6, maxAlive: 40, hpMul: 1.1,
     mix: [{ enemy: 'mite', weight: 3 }, { enemy: 'dart', weight: 1 }, { enemy: 'wisp', weight: 1 }],
