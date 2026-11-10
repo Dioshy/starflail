@@ -15,7 +15,7 @@ export const MOBS: EnemyDef[] = [
     id: 'dart', name: 'Dart', ai: 'dasher',
     hp: 30, speed: 90, radius: 12, contactDamage: 1, mass: 1, xp: 2, stardustChance: 0.02,
     tell: 'Glows, then dashes in a straight line. Step sideways.',
-    params: { triggerRange: 340, telegraphSec: 0.7, dashSpeed: 600, dashSec: 0.35, cooldownSec: 3 },
+    params: { triggerRange: 190, telegraphSec: 0.7, dashSpeed: 600, dashSec: 0.35, cooldownSec: 3 },
   },
   {
     id: 'wisp', name: 'Wisp', ai: 'orbiter',
@@ -74,7 +74,7 @@ export const BOSSES: EnemyDef[] = [
   },
   {
     id: 'hive', name: 'The Hive', ai: 'boss',
-    hp: 9000, speed: 40, radius: 72, contactDamage: 2, mass: 60, xp: 150, stardustChance: 1,
+    hp: 7500, speed: 40, radius: 72, contactDamage: 2, mass: 60, xp: 150, stardustChance: 1,
     summon: 'blobling',
     tell: 'Spawns broods and fires fans. Kill the brood with momentum, then dive.',
     params: {
@@ -87,7 +87,7 @@ export const BOSSES: EnemyDef[] = [
   },
   {
     id: 'eclipse', name: 'Eclipse', ai: 'boss',
-    hp: 18000, speed: 70, radius: 80, contactDamage: 2, mass: 80, xp: 0, stardustChance: 1,
+    hp: 13000, speed: 70, radius: 80, contactDamage: 2, mass: 80, xp: 0, stardustChance: 1,
     tell: 'Spiral arms, blinks, and in phase 2 a gravity well that also whips your orb faster.',
     params: {
       knockbackResist: 0.97,

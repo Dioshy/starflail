@@ -10,7 +10,7 @@ export const ASSUMPTIONS = {
   /** A2: share of dropped XP actually collected. */
   xpCollection: 0.85,
   /** A3: seconds a median run-3+ player needs to kill each boss (balance.md section 2). */
-  bossKillSec: { warden: 40, hive: 45, eclipse: 50 } as Record<string, number>,
+  bossKillSec: { warden: 41, hive: 55, eclipse: 54 } as Record<string, number>,
   /** A4: share of stardust pickups collected. */
   stardustCollection: 0.8,
 } as const;

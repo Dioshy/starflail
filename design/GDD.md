@@ -67,7 +67,7 @@ analog on stick and touch (magnitude scales speed, dead zone 0.15), digital on k
 
 ## 6. Win and lose
 
-- **Lose:** ship HP reaches 0. One **Second Wind** per run may revive you (MONETIZATION.md; free where ads don't exist).
+- **Lose:** ship HP reaches 0. One **Second Wind** per run may revive you (opt-in rewarded ad; free without a video on ad-less platforms and for supporters, so every player has exactly one).
 - **Win:** kill **Eclipse** (spawns at 9:00). The run ends immediately on the kill, including in overtime (after 10:00).
 - Warden (3:00) and Hive (6:00) are optional to kill: if alive 120 s after spawning they warp out with no reward.
 - After 10:00 with Eclipse alive: **overtime**; the 9:00 wave keeps running with HP +15% and spawns +10% every 30 s.
@@ -106,7 +106,7 @@ one-line contextual hints (move, reel, draft) shown the first time each is relev
 | Kind | Count | File |
 |---|---|---|
 | Enemies | 7 (mite, dart, wisp, blob, blobling, spitter, brute) | `enemies.ts` |
-| Bosses | 3 (warden 4 000 HP, hive 9 000 HP, eclipse 18 000 HP) | `enemies.ts` |
+| Bosses | 3 (warden 4 000 HP, hive 7 500 HP, eclipse 13 000 HP) | `enemies.ts` |
 | Waves / events | 11 contiguous waves 0-600 s; 9 events | `waves.ts` |
 | Upgrades | 25 (14 common, 7 rare, 4 epic); 8 behavior, 7 reel/tether; 19 in the default pool | `upgrades.ts` |
 | Ships / orbs | 4 / 4 (first of each free) | `loadout.ts` |
@@ -131,8 +131,9 @@ narrative. Each is a natural post-launch addition; none is required for the loop
 
 ## 12. Open questions (for Muse / playtest)
 
-1. Reel release is symmetric (the speed gained on reel is lost on release). A "slingshot" variant that keeps 25% of
-   the gain is the first thing to A/B in playtests if reel feels like it gives nothing back.
+1. Reel release: the tether goes slack and the orb flings outward at full speed (a slingshot), then the spring catch takes
+   off the radial part (reel.md). If release feels like it gives nothing back, raise the slingshot window by lowering
+   `tetherDamping` (4 → 3) before adding any new rule.
 2. Should a "Reel toggle" accessibility option exist? It enables permanent reel, which held-reel damping already makes
    weak, so it looks safe; confirm in playtest.
 3. Does the first run skip the hangar? Recommended yes.
