@@ -62,7 +62,7 @@ export const MOBS: EnemyDef[] = [
 export const BOSSES: EnemyDef[] = [
   {
     id: 'warden', name: 'The Warden', ai: 'boss',
-    hp: 4000, speed: 80, radius: 56, contactDamage: 2, mass: 40, xp: 45, stardustChance: 1,
+    hp: 3000, speed: 80, radius: 56, contactDamage: 2, mass: 40, xp: 45, stardustChance: 1,
     tell: 'Bait its charge into the wall, then punish.',
     params: {
       knockbackResist: 0.95,

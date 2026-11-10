@@ -232,21 +232,39 @@ export class Game {
     this.renderer.reset();
     this.input.resetReel(); this.input.clearLatches(); this.input.moved = false; this.input.reeled = false;
     this.stepper.acc = 0; this.hitstop = 0; this.slowT = 0; this.draftDelay = 0; this.hintT = 0;
-    if (this.params.skipTo > 0 && this.runIndex === 1) this.skipTo(this.params.skipTo);
+    if (this.params.skipTo > 0 && this.runIndex === 1) this.beginSkip(this.params.skipTo);
     if (import.meta.env.DEV && this.params.draft && this.runIndex === 1) this.world.grantXp(10);
     this.hud.show(true);
     this.hud.setHint(null);
     audio.music.start();
   }
 
-  /** ?skipTo=N: fast-forward with the bot (god mode, auto drafts) so late-game screens can be inspected. */
-  private skipTo(sec: number): void {
-    const w = this.world, god = w.god, auto = w.autoDraft;
+  private skipTarget = 0; private skipGod = false; private skipAuto = false;
+
+  /** ?skipTo=N: fast-forward with the bot (god mode, auto drafts) so late-game screens can be inspected.
+   *  Sliced across frames (40 ms budget each) so the page paints and stays responsive: a long synchronous skip left the
+   *  screen blank at 0:00 until it finished (Hue's skipTo=535 report). */
+  private beginSkip(sec: number): void {
+    const w = this.world;
+    this.skipTarget = sec; this.skipGod = w.god; this.skipAuto = w.autoDraft;
     w.god = true; w.autoDraft = true;
-    while (w.time < sec && !w.outcome) w.step(botIntents(w));
-    w.god = god; w.autoDraft = auto || this.params.auto;
-    w.events.length = 0;
-    this.renderer.reset();
+  }
+  /** returns true while still skipping (the caller must not simulate / take input this frame) */
+  private skipSlice(): boolean {
+    if (this.skipTarget <= 0) return false;
+    const w = this.world, t0 = performance.now();
+    let n = 0;
+    while (w.time < this.skipTarget && !w.outcome) {
+      w.step(botIntents(w)); w.events.length = 0;
+      if ((++n & 31) === 0 && performance.now() - t0 > 40) break;
+    }
+    if (w.time >= this.skipTarget || w.outcome) {
+      this.skipTarget = 0; w.god = this.skipGod; w.autoDraft = this.skipAuto || this.params.auto;
+      w.events.length = 0; this.renderer.reset(); this.last = performance.now(); this.stepper.acc = 0;
+      return false;
+    }
+    this.hud.showBanner(`Skipping… ${Math.floor((w.time / this.skipTarget) * 100)}%`, 200);
+    return true;
   }
 
   private resultsLocked(): boolean { return performance.now() - this.resultsAt < RESULTS_LOCK_MS; }
@@ -380,6 +398,7 @@ export class Game {
 
   private runFrame(c: CanvasRenderingContext2D, intents: Intents, real: number, now: number): void {
     const w = this.world, s = this.screen;
+    if (this.skipSlice()) { this.renderer.draw(c, w, 0, 0, s.w, s.h); this.hud.update(w, 0, false); return; }
     if (intents.pause && !w.outcome && !this.draft.open) this.setPaused(!this.paused);
 
     // delayed draft open (let the level-up burst play), then input

@@ -22,6 +22,8 @@ export interface TelegraphArgs {
   /** 0..1 progress through the telegraph window */
   prog: number;
   t: number;
+  /** Reduced Flashes: hold the brightness pulse at steady mid-level (rings, lanes and dashes still animate). */
+  steady?: boolean;
   params: Record<string, number>;
 }
 
@@ -71,7 +73,7 @@ function lane(c: CanvasRenderingContext2D, a: TelegraphArgs, len: number, width:
 export function drawTelegraph(c: CanvasRenderingContext2D, a: TelegraphArgs): void {
   if (a.state === 0 || (a.state === 2 && !(a.kind === 'eclipse' && a.pat === 2))) return;
   const { x, y, kind, prog, t, params: P } = a;
-  const pu = pulse01(t);
+  const pu = a.steady ? 0.5 : pulse01(t);
   c.save();
   c.lineCap = 'round'; c.lineJoin = 'round';
   c.strokeStyle = DANGER; c.fillStyle = DANGER;

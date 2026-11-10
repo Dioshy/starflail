@@ -21,12 +21,12 @@ Fight-length targets (balance.md §2): 30-60 s for a median player on runs 3+; 6
 | Field | Spec |
 |---|---|
 | Purpose | First skill check: **bait, dodge, punish**. Teaches that the arena wall is a weapon against the boss. |
-| Stats | hp 4 000, speed 80, radius 56, contact 2, mass 40, xp 45, knockbackResist 0.95. |
+| Stats | hp 3 000 (was 4 000, polish-1), speed 80, radius 56, contact 2, mass 40, xp 45, knockbackResist 0.95. |
 | Pattern A: Ring Burst | Every 5 s. Telegraph 0.8 s (body ring glows, 16 tick marks show the projectile lanes), then fire 16 projectiles radially at 220 px/s. Gaps between projectiles at 300 px from the boss = 2π×300/16 ≈ 118 px, wider than the ship (28 px). |
 | Pattern B: Charge | Every 7 s. Telegraph 1.0 s (a red lane 56 px wide from the boss toward the ship, locked), then charge 650 px/s for 0.7 s (455 px). **If it hits the arena wall** during the charge: stunned 2 s and takes ×1.5 damage (a "STUNNED" label above it). |
 | Phase 2 (≤ 50%) | Rings get 24 projectiles (gap ≈ 79 px at 300 px), each ring rotated 7.5° from the last; intervals × 0.75 (ring 3.75 s, charge 5.25 s). |
 | Edge cases | Charge lane crosses the ship's position but the ship moves: the charge continues in the locked line. Stunned while a ring is due: the ring waits until the stun ends. Warden spawns near the wall: the 600 px spawn rule picks an in-arena point. If the charge would stop before the wall (455 px short), there is no stun. |
-| Tests | Given the warden 300 px from the wall facing it, when it charges, then it reaches the wall (455 > 300) and is stunned 2 s; a 144-damage crit deals 216. Given HP drops to 2 000, then the next ring has 24 projectiles. Given 120 s pass alive, then it warps out with no reward. |
+| Tests | Given the warden 300 px from the wall facing it, when it charges, then it reaches the wall (455 > 300) and is stunned 2 s; a 144-damage crit deals 216. Given HP drops to 1 500, then the next ring has 24 projectiles. Given 120 s pass alive, then it warps out with no reward. |
 | Dominant-strategy review | **Wall-baiting** is the intended clever play, but it pulls the player toward the wall, where the orb loses 50% speed on wall contact (tether-and-orb.md). Risk balances reward. **Out-ranging** isn't possible (no ranged attack on the player's side). |
 
 ## Hive (`hive`, 6:00)
