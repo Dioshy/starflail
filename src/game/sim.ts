@@ -172,6 +172,23 @@ export class World {
     th.reelT = Math.min(1, Math.max(0, th.reelT + (reel ? dt / T.reelTime : -dt / T.releaseTime)));
     th.rest = T.tetherLength * (1 - (1 - T.reelRatio) * th.reelT);
     const transitioning = th.reelT !== prevT;
+    // Kinematic reel-in: while the rest length shrinks, project the orb onto the smaller radius and scale its
+    // tangential velocity (relative to the ship) by r_old / r_new, so r*v_t (angular momentum) is conserved.
+    // The spring is NOT relied on to pull the orb in.
+    if (th.reelT > prevT) {
+      const restOld = T.tetherLength * (1 - (1 - T.reelRatio) * prevT);
+      const rx = o.x - s.x, ry = o.y - s.y, L = Math.hypot(rx, ry);
+      if (L > th.rest && L > 8) {
+        const rNew = Math.max(th.rest, L * (th.rest / restOld));
+        const nx = rx / L, ny = ry / L;
+        const rvx = o.vx - s.vx, rvy = o.vy - s.vy;
+        const vt = nx * rvy - ny * rvx;
+        const vtNew = vt * (L / rNew);
+        o.x = s.x + nx * rNew; o.y = s.y + ny * rNew;
+        // radial rel. velocity is zeroed (the projection already moved the orb inward); tangential is scaled
+        o.vx = s.vx - ny * vtNew; o.vy = s.vy + nx * vtNew;
+      }
+    }
     const SUB = 2, h = dt / SUB;
     for (let n = 0; n < SUB; n++) {
       let rx = o.x - s.x, ry = o.y - s.y;
@@ -194,6 +211,14 @@ export class World {
       if (L > th.maxLen) {
         const nx = rx / L, ny = ry / L;
         o.x = s.x + nx * th.maxLen; o.y = s.y + ny * th.maxLen; L = th.maxLen;
+        const vr = (o.vx - s.vx) * nx + (o.vy - s.vy) * ny;
+        if (vr > 0) { o.vx -= nx * vr; o.vy -= ny * vr; }
+      }
+      // fully reeled and held: the short tether is a rigid kinematic rope (strip only the outward radial velocity,
+      // keep the tangential speed), so the fast spin doesn't fling the orb back out through the weak spring
+      if (reel && th.reelT >= 1 && L > th.rest) {
+        const nx = rx / L, ny = ry / L;
+        o.x = s.x + nx * th.rest; o.y = s.y + ny * th.rest; L = th.rest;
         const vr = (o.vx - s.vx) * nx + (o.vy - s.vy) * ny;
         if (vr > 0) { o.vx -= nx * vr; o.vy -= ny * vr; }
       }

@@ -17,23 +17,36 @@ describe('tether', () => {
     expect(worst).toBeGreaterThan(TUNING.tetherLength * 0.9);
   });
 
-  it('reel raises angular speed and conserves angular momentum within 10%', () => {
-    // drag is legitimately dissipative, so disable it to isolate the reel's effect
+  const ang = (w: World) => {
+    const rx = w.orb.x - w.ship.x, ry = w.orb.y - w.ship.y;
+    const h = rx * w.orb.vy - ry * w.orb.vx;
+    return { h, omega: h / (rx * rx + ry * ry), r: Math.hypot(rx, ry) };
+  };
+
+  it('reel to 0.5x length gives >=3x angular speed with L conserved within 10% (drag off, ship still)', () => {
     const w = new World({ seed: 1, noSpawn: true, tuning: { ...TUNING, orbDrag: 0 } });
     w.orb.x = w.orb.px = TUNING.tetherLength; w.orb.y = w.orb.py = 0;
-    w.orb.vx = 0; w.orb.vy = 500; // tangential swing, ship stationary
-    // settle one step so the spring state is consistent
-    const ang = () => {
-      const rx = w.orb.x - w.ship.x, ry = w.orb.y - w.ship.y;
-      const h = rx * w.orb.vy - ry * w.orb.vx;
-      return { h, omega: h / (rx * rx + ry * ry) };
-    };
-    for (let i = 0; i < 10; i++) w.step(idle());
-    const before = ang();
-    for (let i = 0; i < 40; i++) w.step({ ...idle(), reel: true });
-    const after = ang();
-    expect(after.omega).toBeGreaterThan(before.omega * 1.3);
-    expect(Math.abs(after.h - before.h) / Math.abs(before.h)).toBeLessThan(0.1);
+    w.orb.vx = 0; w.orb.vy = 300; // orbiting at full length, well below the speed cap even at 4x
+    const before = ang(w);
+    for (let i = 0; i < 30; i++) {
+      w.step({ ...idle(), reel: true });
+      expect(Math.abs(ang(w).h - before.h) / before.h).toBeLessThan(0.1);
+    }
+    const after = ang(w);
+    expect(after.omega / before.omega).toBeGreaterThanOrEqual(3);
+  });
+
+  it('with default drag, angular speed is >=2x within 0.35 s of reeling from a ~450 px/s swing', () => {
+    const w = new World({ seed: 1, noSpawn: true });
+    w.orb.x = w.orb.px = TUNING.tetherLength; w.orb.y = w.orb.py = 0;
+    w.orb.vx = 0; w.orb.vy = 540; // ~450 px/s once the settle steps and drag have acted
+    for (let i = 0; i < 8; i++) w.step(idle()); // let the swing reach its stretch
+    const before = ang(w);
+    expect(w.orbSpeed()).toBeGreaterThan(400);
+    expect(w.orbSpeed()).toBeLessThan(500);
+    let best = 0;
+    for (let i = 0; i < 21; i++) { w.step({ ...idle(), reel: true }); best = Math.max(best, ang(w).omega / before.omega); }
+    expect(best).toBeGreaterThanOrEqual(2);
   });
 });
 

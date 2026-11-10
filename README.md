@@ -41,6 +41,6 @@ The speed meter (bottom left) marks where damage starts and where crits start. T
 - `src/core/` engine primitives: fixed-step loop, seeded RNG, canvas letterboxing, input, spatial hash, pools.
 - `src/game/sim.ts` DOM-free simulation (`World.step(intents)`, `stateHash()`), `tuning.ts` (all placeholder numbers), `render.ts` (all drawing), `game.ts` (loop glue, hitstop).
 - `src/ui/hud.ts` canvas HUD, death/pause screens, touch controls.
-- `tests/` determinism, tether, reel, damage, cooldown, spatial hash.
+- `tests/` determinism, tether, kinematic reel (3x+ spin), reel skill (pulse beats hold), damage, cooldown, spatial hash.
 
 The sim never uses `Math.random` or wall-clock time; cosmetics use a separate RNG stream.
