@@ -16,6 +16,12 @@ with telemetry after the first playtest (median time-of-death, boss kill times, 
 | A6 | Orb hits per second on a boss | run 1: 0.7, run 2: 0.85, run 3+: 1.0 (Warden), 1.2 (Hive), 1.3 (Eclipse) | Large hitboxes; each lap passes through once or twice |
 | A7 | Share of boss hits that crit | run 1: 5%, run 2: 15%, run 3+: 30-50% | Rises as reel timing improves |
 | A8 | Novice contact hits taken per minute (no upgrades in defence) | 0.3, 0.6, 1.2, 2.0, 2.0, 2.5 for minutes 1-6 | Estimate; telemetry: hits/min by minute |
+| P1 | Gear's greybox (t11, `orbDrag` 1.25, circle rate 1): pulsed reels ≈ 790 dmg/s, held reel ≈ 290, never reeling ≈ 3 | measured | Gear's harness; re-run after every lever change in §8 |
+| P2 | Same harness hit rate for passive and pulsed play (same circle rate and target ring) | h ≈ 790 / 160 ≈ 4.9 hits/s | Pulsed hits are mostly crits at ~1 000 px/s = 160 dmg |
+| P3 | Passive (never-reel) orb speed at contact | p50 ≈ 220 px/s | Inferred: 3 dmg/s ÷ 4.9 hits/s = 0.6 dmg/hit, so only ~3% of passive hits clear 250 px/s. **Gear: log speed-at-contact to confirm** |
+
+Note: A6 and A7 (§2) were written before Gear's relative `orbDrag`. Re-measure boss hit rate and crit share in the greybox
+before trusting the §2 fight times.
 
 ## 1. First-run death at 4-7 minutes
 
@@ -110,3 +116,30 @@ Per run: `secondsSurvived/60 × 10 + bosses × 50 + win × 150 + pickups × 5` (
 3. `WAVES[].hpMul`: the late-game tension curve.
 4. `xpForLevel`: draft cadence (§4).
 5. `PROGRESSION.stardust.perMinuteSurvived`: meta pace (§5).
+6. `minDamageSpeed` and `PHYSICS.orbDrag`: the new-player passive floor (§8).
+
+## 8. Passive swing floor (a player who never reels)
+
+**Target.** A player who only moves and swings, never reeling, must (a) kill a first-minute mite (20 HP × hpMul 1.0) in
+**≤ 2 hits**, and (b) reach **15-25% of pulsed-reel DPS**. Below 15%, the first minute feels broken before the reel has
+been learned. Above 25%, the reel stops mattering (P1). Today: 3 / 790 = **0.4%**, so the target fails.
+
+**What the target means in numbers** (P1-P3; `dmg = v × 0.08` at base, non-crit):
+- (a) `dmg(v_p) ≥ 10` ⇒ `v_p ≥ 125 px/s` **and** `v_p ≥ minDamageSpeed`.
+- (b) At the same hit rate, `DPS_passive / DPS_pulsed = dmg(v_p) / 160`. 15-25% ⇒ `dmg(v_p)` = 24-40 ⇒ **`v_p` = 300-500 px/s**.
+- So the gate (`minDamageSpeed` 250, above the passive p50 of 220) is what zeroes passive damage, and the passive speed (220) is what caps the ratio.
+
+| Lever (data only, no new rule) | Passive hit at p50 | Mite hits | Passive / pulsed | Side effects |
+|---|---|---|---|---|
+| none (today) | 220 < 250 → bump, 0 | ∞ | 0.4% | — |
+| `minDamageSpeed` 250 → **150** | 220 × 0.08 = 17.6 | 2 ✓ | 17.6 / 160 = **11%** | Pulsed DPS unchanged (its hits are far above 150). Glancing Blows needs the `STAT_LIMITS.minDamageSpeed.min` floor lowered 120 → **60** to keep all 3 stacks meaningful (150 → 60). |
+| `orbDrag` 1.25 → **0.9** (alone) | 220 × 1.25/0.9 ≈ 306 if the whole p50 is swing (first-order lag: steady swing ∝ 1/drag) | 1 ✓ | 24.4 / 160 ≈ **15%** | Raises pulsed DPS too (the ratio shifts less than shown); held damping becomes 0.9 + 1.5 = 2.4/s, so hold is still far worse than pulsing |
+| **Both** (recommended) | ≈ 306 × 0.08 = 24.4 | 1 ✓ | **≈ 15-17%** | Inside the band with margin to tune `orbDrag` between 0.8 and 1.0 |
+
+**Recommendation for Gear (integration, t14).**
+1. Set `BASE_STATS.minDamageSpeed` 250 → **150** and `STAT_LIMITS.minDamageSpeed.min` 120 → **60**. This is the cheapest fix: it guarantees (a) and doesn't touch reel feel.
+2. Re-run the harness. If passive is still < 15% of pulsed, lower `PHYSICS.orbDrag` 1.25 → **0.9** (try 1.0 / 0.9 / 0.8 and keep the highest value that reaches 15%).
+3. Accept when, in the harness: passive/pulsed ∈ [0.15, 0.25], a first-minute mite dies in ≤ 2 passive hits, and pulsed > 2× held. Report the three numbers back so this section moves from modelled to measured.
+
+`passiveSwingFloor()` in `balanceModel.ts` encodes this check, and `data.test.ts` asserts that the recommended values pass
+under P2/P3 while today's values fail. Gear swaps in measured speeds when available.

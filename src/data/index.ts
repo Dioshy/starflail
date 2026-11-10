@@ -3,7 +3,7 @@ import { BOSSES, MOBS } from './enemies';
 import type { EnemyDef } from './types';
 
 export * from './types';
-export { BASE_STATS, STAT_LIMITS, PHYSICS } from './stats';
+export { BASE_STATS, STAT_LIMITS, PHYSICS, INPUT_DEFAULTS } from './stats';
 export { MOBS, BOSSES } from './enemies';
 export { WAVES, EVENTS, DIRECTOR } from './waves';
 export { UPGRADES, BEHAVIOR_PARAMS } from './upgrades';

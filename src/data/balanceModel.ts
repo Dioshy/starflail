@@ -1,7 +1,7 @@
 // Deterministic paper model behind design/mechanics/balance.md. Every assumption is a named constant.
 // These are MODELLED numbers, to be replaced by playtest telemetry. data.test.ts asserts the targets.
-import { BOSSES, ENEMIES, EVENTS, PROGRESSION, RUN_LENGTH_SEC, STAT_LIMITS, WAVES } from './index';
-import { runStardust, xpToNext } from './formulas';
+import { BASE_STATS, BOSSES, ENEMIES, EVENTS, PROGRESSION, RUN_LENGTH_SEC, STAT_LIMITS, WAVES } from './index';
+import { hitDamage, runStardust, xpToNext } from './formulas';
 import type { EnemyDef, WaveDef } from './types';
 
 export const ASSUMPTIONS = {
@@ -141,4 +141,35 @@ export function worstCaseHit(): number {
 
 export function bossHp(id: string): number {
   return BOSSES.find((b) => b.id === id)!.hp;
+}
+
+/** P1-P3 in balance.md §8: Gear's greybox measurements and what they imply. */
+export const PASSIVE_SWING = {
+  /** measured pulsed-reel DPS in Gear's harness (orbDrag 1.25, circle rate 1) */
+  pulsedDps: 790,
+  /** average damage of a pulsed-reel hit (mostly crits at ~1000 px/s, base stats) */
+  pulsedHitDamage: 160,
+  /** inferred p50 orb speed at contact when never reeling, at orbDrag 1.25 */
+  passiveSpeedP50: 220,
+  targetRatio: { min: 0.15, max: 0.25 },
+  maxHitsToKillMite: 2,
+} as const;
+
+/** Passive speed after changing orbDrag, first-order (steady swing ∝ 1 / drag). An estimate, not a sim. */
+export function passiveSpeedAtDrag(orbDrag: number, measuredAt = 1.25, speed = PASSIVE_SWING.passiveSpeedP50): number {
+  return speed * (measuredAt / orbDrag);
+}
+
+/** Checks the passive-swing floor for a never-reeling player against the first-minute mite. */
+export function passiveSwingFloor(minDamageSpeed: number, passiveSpeed: number) {
+  const stats = { ...BASE_STATS, minDamageSpeed };
+  const hit = hitDamage(passiveSpeed, stats).damage;
+  const mite = ENEMIES.find((e) => e.id === 'mite')!;
+  const miteHp = mite.hp * WAVES[0].hpMul;
+  const hitsToKillMite = hit > 0 ? Math.ceil(miteHp / hit) : Infinity;
+  const ratio = hit / PASSIVE_SWING.pulsedHitDamage;
+  const ok =
+    hitsToKillMite <= PASSIVE_SWING.maxHitsToKillMite &&
+    ratio >= PASSIVE_SWING.targetRatio.min && ratio <= PASSIVE_SWING.targetRatio.max;
+  return { hit, hitsToKillMite, ratio, ok };
 }

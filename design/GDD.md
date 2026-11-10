@@ -57,12 +57,16 @@ and the meta loop adds options (new ships, orbs, upgrade packs), never raw power
 | Intent | Keyboard + mouse | Gamepad | Touch |
 |---|---|---|---|
 | Move | WASD or arrow keys | Left stick | Floating virtual joystick (left half of screen) |
-| Reel (hold) | Space, Shift, or right mouse button | A (South) | Reel button, bottom right, 96 px, hold |
+| Reel (hold; toggle optional) | Space, Shift, or right mouse button | A (South) | Reel button, bottom right, 96 px |
 | Draft pick | 1 / 2 / 3, or click | D-pad + A | Tap card |
 | Reroll draft | R | Y (North) | Reroll button |
 | Pause | Esc / P | Start | Pause icon top-right; auto-pause on tab blur |
 
-Rules: Reel is a hold, never a toggle (an accessibility option "Reel toggle" is allowed; see open questions). Movement is
+Rules: **Reel mode** is an accessibility setting (Settings → Controls → "Reel: Hold / Toggle", `INPUT_DEFAULTS.reelMode`).
+The default is **Hold**: reel while the button is down. **Toggle**: each press latches or unlatches the reel (the touch button
+shows a filled ring while latched). Both modes use identical rules; toggle gives no advantage, because a long hold is weaker than
+pulsing (reel.md). Movement is analog on stick and touch (magnitude scales speed, dead zone 0.15) and digital on keys
+(normalised diagonal).
 analog on stick and touch (magnitude scales speed, dead zone 0.15), digital on keys (normalised diagonal).
 
 ## 6. Win and lose
@@ -134,6 +138,5 @@ narrative. Each is a natural post-launch addition; none is required for the loop
 1. Reel release: the tether goes slack and the orb flings outward at full speed (a slingshot), then the spring catch takes
    off the radial part (reel.md). If release feels like it gives nothing back, raise the slingshot window by lowering
    `tetherDamping` (4 → 3) before adding any new rule.
-2. Should a "Reel toggle" accessibility option exist? It enables permanent reel, which held-reel damping already makes
-   weak, so it looks safe; confirm in playtest.
+2. ~~Reel toggle?~~ Resolved: added as an accessibility setting, default Hold (reel.md, *Reel mode*).
 3. Does the first run skip the hangar? Recommended yes.

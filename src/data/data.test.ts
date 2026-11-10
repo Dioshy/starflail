@@ -6,7 +6,7 @@ import {
 import type { StatKey, StatMod } from './index';
 import { validateData } from './validate';
 import {
-  MEDIAN_PLAYER_RUNS, cumulativeStardust, levelUpTimes, worstCaseHit,
+  MEDIAN_PLAYER_RUNS, PASSIVE_SWING, cumulativeStardust, levelUpTimes, passiveSpeedAtDrag, passiveSwingFloor, worstCaseHit,
 } from './balanceModel';
 
 /** Seeded PRNG (mulberry32) so draft tests are reproducible. */
@@ -186,5 +186,21 @@ describe('meta progression (pillar 3: options, not power)', () => {
     expect(runStardust({ secondsSurvived: 90, bossKills: 0, won: false, stardustPickups: 0, stardustGain: 1 })).toBe(15);
     expect(runStardust({ secondsSurvived: 600, bossKills: 3, won: true, stardustPickups: 10, stardustGain: 9 }))
       .toBe(Math.floor((100 + 150 + 150 + 50) * STAT_LIMITS.stardustGain.max));
+  });
+});
+
+describe('passive swing floor (balance.md section 8)', () => {
+  it('given today\'s tuning (minDamageSpeed 250, orbDrag 1.25), then a never-reeling player fails the floor', () => {
+    expect(passiveSwingFloor(250, PASSIVE_SWING.passiveSpeedP50).ok).toBe(false);
+  });
+  it('given minDamageSpeed 150 alone, then a mite dies in 2 passive hits but DPS is still under 15%', () => {
+    const r = passiveSwingFloor(150, PASSIVE_SWING.passiveSpeedP50);
+    expect(r.hitsToKillMite).toBe(2);
+    expect(r.ratio).toBeLessThan(0.15);
+  });
+  it('given the recommendation (minDamageSpeed 150 + orbDrag 0.9), then the floor is met', () => {
+    const r = passiveSwingFloor(150, passiveSpeedAtDrag(0.9));
+    expect(r.ok).toBe(true);
+    expect(r.hitsToKillMite).toBeLessThanOrEqual(2);
   });
 });

@@ -187,7 +187,8 @@ export interface PhysicsDef {
   heldReelExtraDamping: number;
   wallSpeedLoss: number;
   reelReleaseSec: number;
-  orbLinearDrag: number;
+  /** 1/s linear drag on orb velocity RELATIVE to the ship (Gear greybox t11 tuning) */
+  orbDrag: number;
   tetherDamping: number;
   maxStretchRatio: number;
   massDamageExponent: number;
@@ -197,6 +198,14 @@ export interface PhysicsDef {
   knockbackDecayPerSec: number;
   projectileHardCap: number;
   fixedStepHz: number;
+}
+
+export type ReelMode = 'hold' | 'toggle';
+
+/** Player-facing input defaults; the player's settings save overrides them. */
+export interface InputDefaultsDef {
+  reelMode: ReelMode;
+  stickDeadZone: number;
 }
 
 export interface DirectorDef {

@@ -1,4 +1,4 @@
-import type { PhysicsDef, StatKey, Stats } from './types';
+import type { InputDefaultsDef, PhysicsDef, StatKey, Stats } from './types';
 
 // Rule cards: tether-and-orb.md, reel.md, damage-and-crit.md, health.md
 export const BASE_STATS: Stats = {
@@ -53,7 +53,7 @@ export const PHYSICS: PhysicsDef = {
   heldReelExtraDamping: 1.5, // 1/s, applied after the reel completes while still held
   wallSpeedLoss: 0.5, // fraction of orb speed lost on arena-wall contact
   reelReleaseSec: 0.35, // rest length lerps back to L
-  orbLinearDrag: 0.15, // 1/s, always on
+  orbDrag: 1.25, // 1/s: v_rel = orb.vel - ship.vel; v_rel *= exp(-orbDrag * dt). Tuned in Gear's greybox (t11)
   tetherDamping: 4, // 1/s, damps radial (stretch) velocity only
   maxStretchRatio: 1.6, // tether behaves as a hard rope beyond 1.6 * rest length
   massDamageExponent: 0.5, // damage scales with orbMass^0.5
@@ -63,4 +63,10 @@ export const PHYSICS: PhysicsDef = {
   knockbackDecayPerSec: 6, // enemy knockback velocity *= exp(-6 * dt)
   projectileHardCap: 300, // oldest enemy projectile is removed beyond this
   fixedStepHz: 60,
+};
+
+/** Accessibility: reel can be 'hold' (default) or 'toggle' (reel.md). */
+export const INPUT_DEFAULTS: InputDefaultsDef = {
+  reelMode: 'hold',
+  stickDeadZone: 0.15,
 };
