@@ -275,8 +275,8 @@ export class ResultsScreen {
     const hangar = h('button', 'btn', 'Hangar');
     hangar.addEventListener('click', () => this.onHangar());
     row.append(again, hangar);
-    this.panel.append(row, h('div', 'res-hint', 'Enter / R / tap to go again'));
-    again.focus({ preventScroll: true });
+    this.panel.append(row, h('div', 'res-hint', 'Enter / R / tap to go again (Space is the reel)'));
+    // no focus on GO AGAIN: a focused button is activated by Space keyup, and Space is the reel key (Enter / click / tap restart)
     // count-up
     cancelAnimationFrame(this.raf);
     const t0 = performance.now();

@@ -25,6 +25,8 @@ type State = 'title' | 'hangar' | 'store' | 'run' | 'results';
 const DEATH_DELAY = 0.85; // s of death cam before results (restart stays well under 2 s)
 const WIN_DELAY = 1.6;
 const DRAFT_DELAY = 0.25; // s of level-up burst before the cards appear
+/** Results ignore restart input this long (a mashed reel key / tap from the death must not skip the stardust and unlock beat). */
+export const RESULTS_LOCK_MS = 600;
 const DRAFT_LOCK_MS = 350; // ignore picks right after the draft opens (a held reel button must not pick)
 
 export class Game {
@@ -63,6 +65,7 @@ export class Game {
   private unlocked = false;
   private hintT = 0;
   private resultsShown = false;
+  private resultsAt = 0;
   private dieUsed = false;
   private abandoned = false;
   private xpCombo = 0; private xpComboT = 0;
@@ -155,7 +158,7 @@ export class Game {
     this.title.onHangar = () => this.goHangar();
     this.hangar.onBack = () => this.goTitle();
     this.hangar.onLaunch = () => this.startRun();
-    this.results.onAgain = () => this.startRun();
+    this.results.onAgain = () => { if (this.resultsLocked()) return; this.startRun(); };
     this.results.onHangar = () => { void this.ads.maybeInterstitial().then(() => this.goHangar()); };
     this.results.onDouble = async () => {
       if (!(await this.ads.requestDoubleStardust())) return 0;
@@ -246,11 +249,13 @@ export class Game {
     this.renderer.reset();
   }
 
+  private resultsLocked(): boolean { return performance.now() - this.resultsAt < RESULTS_LOCK_MS; }
+
   private lastEarned = 0;
 
   private showResults(): void {
     if (this.resultsShown) return;
-    this.resultsShown = true;
+    this.resultsShown = true; this.resultsAt = performance.now(); this.input.clearLatches();
     this.ads.endRun(); this.ads.beginResults();
     const w = this.world, sum = w.summary();
     const earned = w.stardustEarned();
@@ -345,6 +350,7 @@ export class Game {
         this.renderer.drawMenu(c, s.w, s.h, real, 'title');
         if (any || intents.confirm) this.fromTitle(); // any key / tap on the canvas starts (DOM buttons handle their own clicks)
         break;
+      case 'store':
       case 'hangar': {
         const d = this.store.data;
         this.renderer.drawMenu(c, s.w, s.h, real, 'hangar', { ship: d.equipped.ship, orb: d.equipped.orb, shipSkin: d.equipped.shipSkin as ShipSkin, orbSkin: d.equipped.orbSkin as OrbSkin });
@@ -352,7 +358,8 @@ export class Game {
       }
       case 'results':
         this.renderer.drawMenu(c, s.w, s.h, real, 'results');
-        if ((intents.confirm || this.input.takeReroll()) && !this.adActive) this.startRun();
+        if (this.resultsLocked()) { this.input.takeStart(); this.input.takeReroll(); }
+        else if ((this.input.takeStart() || this.input.takeReroll()) && !this.adActive) this.startRun();
         break;
       case 'run':
         this.runFrame(c, intents, real, now);

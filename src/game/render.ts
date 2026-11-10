@@ -150,7 +150,8 @@ export class Renderer {
     if (e.state === 0) return;
     const P = e.def.params;
     const prog = e.state === 1 ? 1 - e.timer / e.telTotal : 1;
-    const flash = Math.floor(this.t * 8) % 2 === 0; // 4 Hz
+    // 4 Hz normally; with Reduced Flashes the lane stays steady (no strobe at all, B5)
+    const flash = !this.opts.reducedFlashes && Math.floor(this.t * 8) % 2 === 0;
     c.save();
     c.lineCap = 'round';
     const col = flash && e.state === 1 ? '#ffffff' : DANGER;
