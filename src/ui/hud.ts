@@ -1,94 +1,99 @@
-import { JOY_RADIUS, REEL_BTN, type TouchState } from '../core/input';
-import { LOGICAL_H, LOGICAL_W } from '../core/canvas';
+import { BOSS_TIMES_SEC, PHYSICS, PROGRESSION } from '../data';
 import type { World } from '../game/sim';
+import { h, fmtTime } from './dom';
 
-const FONT = '600 18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+/** DOM HUD: hearts, XP bar, timer + boss pips, level, stardust, boss bar, orb-speed meter, banner, hints, touch buttons. */
+export class Hud {
+  readonly el: HTMLElement;
+  readonly reelBtn: HTMLButtonElement;
+  readonly pauseBtn: HTMLButtonElement;
+  private hearts = h('div', 'hud-hearts');
+  private time = h('div', 'hud-time', '0:00');
+  private pips = h('div', 'hud-pips');
+  private dust = h('div', 'hud-dust', '✦ 0');
+  private lv = h('span', 'hud-lv', 'LV 1');
+  private xpFill = h('div', 'fill');
+  private speedFill = h('div', 'fill');
+  private boss = h('div', 'hud-boss hidden');
+  private bossName = h('div', 'boss-name');
+  private bossFill = h('div', 'fill');
+  private banner = h('div', 'hud-banner hidden');
+  private hint = h('div', 'hud-hint hidden');
+  private heartKey = '';
+  private bannerT = 0;
+  private lastText = { time: '', dust: '', lv: '' };
+  private pipEls: HTMLElement[] = [];
 
-function text(c: CanvasRenderingContext2D, s: string, x: number, y: number, size: number, color: string, align: CanvasTextAlign = 'left'): void {
-  c.font = `700 ${size}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
-  c.textAlign = align; c.fillStyle = color; c.fillText(s, x, y);
-}
-
-export function drawHud(c: CanvasRenderingContext2D, w: World, time: number): void {
-  c.save();
-  c.globalCompositeOperation = 'source-over';
-  c.shadowBlur = 0;
-  // hearts
-  const max = w.T.hearts;
-  for (let i = 0; i < max; i++) {
-    const x = 34 + i * 34, y = 36, full = i < w.ship.hearts;
-    c.beginPath(); c.arc(x, y, 11, 0, Math.PI * 2);
-    c.fillStyle = full ? '#ff3d6e' : 'rgba(255,61,110,0.15)'; c.fill();
-    c.lineWidth = 2; c.strokeStyle = full ? '#ffd0dc' : 'rgba(255,255,255,0.2)'; c.stroke();
+  constructor(parent: HTMLElement) {
+    const el = this.el = h('div', 'hud hidden');
+    const top = h('div', 'hud-top');
+    const mid = h('div', 'hud-mid');
+    mid.append(this.time, this.pips);
+    const right = h('div', 'hud-right');
+    this.pauseBtn = h('button', 'btn hud-pause', 'II', { 'aria-label': 'Pause' });
+    right.append(this.dust, this.pauseBtn);
+    top.append(this.hearts, mid, right);
+    for (const [name, at] of Object.entries(BOSS_TIMES_SEC)) {
+      const p = h('span', 'pip', name === 'warden' ? '3:00' : name === 'hive' ? '6:00' : '9:00'); p.dataset.at = String(at); this.pips.append(p); this.pipEls.push(p);
+    }
+    const bar = h('div', 'bar boss-bar'); bar.append(this.bossFill, h('div', 'notch'));
+    this.boss.append(this.bossName, bar);
+    const bottom = h('div', 'hud-bottom');
+    const speed = h('div', 'hud-speed');
+    const sbar = h('div', 'bar speed-bar'); sbar.append(this.speedFill);
+    const tick = (v: number): HTMLElement => { const t = h('div', 'tick'); t.style.left = `${(v / PHYSICS.maxOrbSpeed) * 100}%`; return t; };
+    sbar.append(tick(0), tick(0));
+    this.speedTicks = [sbar.children[1] as HTMLElement, sbar.children[2] as HTMLElement];
+    speed.append(h('div', 'hud-speed-label', 'ORB SPEED'), sbar);
+    const xp = h('div', 'hud-xp');
+    const xbar = h('div', 'bar xp-bar'); xbar.append(this.xpFill);
+    xp.append(this.lv, xbar);
+    bottom.append(speed, xp);
+    this.reelBtn = h('button', 'btn reel-btn', 'REEL', { 'aria-label': 'Reel' });
+    el.append(top, this.boss, this.banner, this.hint, bottom, this.reelBtn);
+    parent.append(el);
   }
-  // timer + kills
-  const sec = Math.floor(w.time), mm = Math.floor(sec / 60), ss = String(sec % 60).padStart(2, '0');
-  text(c, `${mm}:${ss}`, LOGICAL_W / 2, 40, 26, '#e8f6ff', 'center');
-  text(c, `${w.kills} smashed`, LOGICAL_W - 24, 38, 18, '#9fb6d9', 'right');
-  // xp bar
-  const bw = 520, bx = (LOGICAL_W - bw) / 2, by = LOGICAL_H - 34;
-  c.fillStyle = 'rgba(255,255,255,0.1)'; c.fillRect(bx, by, bw, 10);
-  c.fillStyle = '#35f2c4'; c.fillRect(bx, by, bw * Math.min(1, w.xp / w.xpNext), 10);
-  text(c, `LV ${w.level}`, bx - 14, by + 10, 18, '#35f2c4', 'right');
-  // orb speed meter: shows where damage starts
-  const T = w.T, mx = 24, my = LOGICAL_H - 34, mw = 180;
-  c.fillStyle = 'rgba(255,255,255,0.1)'; c.fillRect(mx, my, mw, 10);
-  const sp = w.orbSpeed(), f = Math.min(1, sp / T.maxOrbSpeed);
-  c.fillStyle = sp >= T.critSpeed ? '#ffb347' : sp >= T.minDamageSpeed ? '#7ee8ff' : '#4a5a85';
-  c.fillRect(mx, my, mw * f, 10);
-  c.fillStyle = '#fff';
-  c.fillRect(mx + (mw * T.minDamageSpeed) / T.maxOrbSpeed - 1, my - 3, 2, 16);
-  c.fillRect(mx + (mw * T.critSpeed) / T.maxOrbSpeed - 1, my - 3, 2, 16);
-  text(c, 'SPEED', mx, my - 8, 12, '#9fb6d9');
-  void FONT; void time;
-  c.restore();
-}
+  private speedTicks: HTMLElement[] = [];
 
-export function drawTouch(c: CanvasRenderingContext2D, t: TouchState): void {
-  if (!t.seen) return;
-  c.save();
-  c.globalCompositeOperation = 'source-over';
-  c.lineWidth = 3;
-  if (t.joyActive) {
-    c.strokeStyle = 'rgba(126,232,255,0.5)';
-    c.beginPath(); c.arc(t.joyOx, t.joyOy, JOY_RADIUS, 0, Math.PI * 2); c.stroke();
-    const dx = t.joyX - t.joyOx, dy = t.joyY - t.joyOy, d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / JOY_RADIUS);
-    c.fillStyle = 'rgba(126,232,255,0.45)';
-    c.beginPath(); c.arc(t.joyOx + (dx / d) * k * JOY_RADIUS, t.joyOy + (dy / d) * k * JOY_RADIUS, 28, 0, Math.PI * 2); c.fill();
+  show(v: boolean): void { this.el.classList.toggle('hidden', !v); if (v) this.heartKey = ''; }
+
+  setHint(text: string | null): void {
+    if (text === null) { this.hint.classList.add('hidden'); return; }
+    if (this.hint.textContent !== text) this.hint.textContent = text;
+    this.hint.classList.remove('hidden');
   }
-  c.strokeStyle = t.reelActive ? 'rgba(255,179,71,0.9)' : 'rgba(255,179,71,0.4)';
-  c.fillStyle = t.reelActive ? 'rgba(255,179,71,0.3)' : 'rgba(255,179,71,0.08)';
-  c.beginPath(); c.arc(REEL_BTN.x, REEL_BTN.y, REEL_BTN.r, 0, Math.PI * 2); c.fill(); c.stroke();
-  text(c, 'REEL', REEL_BTN.x, REEL_BTN.y + 8, 24, 'rgba(255,220,170,0.9)', 'center');
-  c.restore();
-}
 
-export function drawDeath(c: CanvasRenderingContext2D, w: World, touch: boolean): void {
-  c.save();
-  c.globalCompositeOperation = 'source-over';
-  const a = Math.min(0.6, w.deadTime * 1.5);
-  c.fillStyle = `rgba(5,6,15,${a})`; c.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
-  if (w.deadTime > 0.15) {
-    text(c, 'TETHER SEVERED', LOGICAL_W / 2, 300, 54, '#ff3d6e', 'center');
-    const sec = Math.floor(w.time);
-    text(c, `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}  ·  ${w.kills} smashed  ·  LV ${w.level}`, LOGICAL_W / 2, 350, 22, '#e8f6ff', 'center');
-    if (w.deadTime >= w.T.deathLockout) text(c, touch ? 'TAP TO GO AGAIN' : 'PRESS ENTER / SPACE / CLICK TO GO AGAIN', LOGICAL_W / 2, 410, 22, '#35f2c4', 'center');
+  showBanner(text: string, ms = 2200): void { this.banner.textContent = text; this.banner.classList.remove('hidden'); this.bannerT = ms / 1000; }
+
+  update(w: World, dt: number, reelLatched: boolean): void {
+    const s = w.ship;
+    const key = `${s.hp}/${s.maxHp}`;
+    if (key !== this.heartKey) {
+      this.heartKey = key;
+      this.hearts.replaceChildren();
+      for (let i = 0; i < s.maxHp; i++) this.hearts.append(h('span', i < s.hp ? 'heart full' : 'heart', '♥'));
+    }
+    const t = fmtTime(w.time);
+    if (t !== this.lastText.time) { this.time.textContent = t; this.lastText.time = t; }
+    for (const p of this.pipEls) p.classList.toggle('done', w.time >= Number(p.dataset.at));
+    const dust = `✦ ${w.stardustEarned()}`;
+    if (dust !== this.lastText.dust) { this.dust.textContent = dust; this.lastText.dust = dust; }
+    const lv = `LV ${w.level}`;
+    if (lv !== this.lastText.lv) { this.lv.textContent = lv; this.lastText.lv = lv; }
+    this.xpFill.style.width = `${Math.min(100, (w.xp / w.xpNext) * 100)}%`;
+    const sp = w.orbSpeed();
+    this.speedFill.style.width = `${Math.min(100, (sp / PHYSICS.maxOrbSpeed) * 100)}%`;
+    this.speedFill.className = sp >= w.stats.critSpeed ? 'fill crit' : sp >= w.stats.minDamageSpeed ? 'fill ok' : 'fill';
+    this.speedTicks[0].style.left = `${(w.stats.minDamageSpeed / PHYSICS.maxOrbSpeed) * 100}%`;
+    this.speedTicks[1].style.left = `${(w.stats.critSpeed / PHYSICS.maxOrbSpeed) * 100}%`;
+    const b = w.activeBoss();
+    if (b) {
+      this.boss.classList.remove('hidden');
+      this.bossName.textContent = b.def.name;
+      this.bossFill.style.width = `${Math.max(0, (b.hp / b.maxHp) * 100)}%`;
+    } else this.boss.classList.add('hidden');
+    if (this.bannerT > 0) { this.bannerT -= dt; if (this.bannerT <= 0) this.banner.classList.add('hidden'); }
+    this.reelBtn.classList.toggle('latched', reelLatched);
+    void PROGRESSION;
   }
-  c.restore();
-}
-
-export function drawPause(c: CanvasRenderingContext2D): void {
-  c.save();
-  c.fillStyle = 'rgba(5,6,15,0.65)'; c.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
-  text(c, 'PAUSED', LOGICAL_W / 2, 340, 54, '#e8f6ff', 'center');
-  text(c, 'Esc / P / Start to resume', LOGICAL_W / 2, 385, 20, '#9fb6d9', 'center');
-  c.restore();
-}
-
-export function drawDebug(c: CanvasRenderingContext2D, lines: string[]): void {
-  c.save();
-  c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillRect(8, 56, 300, lines.length * 18 + 10);
-  c.font = '14px ui-monospace, Menlo, Consolas, monospace'; c.textAlign = 'left'; c.fillStyle = '#9dff9d';
-  lines.forEach((l, i) => c.fillText(l, 16, 76 + i * 18));
-  c.restore();
 }

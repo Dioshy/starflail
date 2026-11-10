@@ -55,10 +55,10 @@ describe('stat formula', () => {
 describe('damage and crit', () => {
   const s = computeStats([]);
   it('given speed below minDamageSpeed, then it is a bump with 0 damage', () => {
-    expect(hitDamage(249, s)).toEqual({ damage: 0, crit: false, bump: true });
+    expect(hitDamage(149, s)).toEqual({ damage: 0, crit: false, bump: true });
   });
   it('given speed exactly minDamageSpeed, then it deals damage', () => {
-    expect(hitDamage(250, s)).toEqual({ damage: 20, crit: false, bump: false });
+    expect(hitDamage(150, s)).toEqual({ damage: 12, crit: false, bump: false });
   });
   it('given speed exactly critSpeed, then it crits', () => {
     expect(hitDamage(900, s)).toEqual({ damage: 144, crit: true, bump: false });
@@ -106,7 +106,7 @@ describe('xp', () => {
 });
 
 describe('upgrade draft', () => {
-  const base = { unlockedMeta: new Set<string>(), stacks: {}, currentMods: [], activeBehaviors: new Set() } as const;
+  const base = { unlockedMeta: new Set<string>(), stacks: {}, currentMods: [], activeBehaviors: new Set<never>() } as const;
   it('given no meta unlocks, then locked upgrades are never eligible', () => {
     const ids = eligibleUpgrades(base).map((u) => u.id);
     for (const u of UPGRADES.filter((x) => x.unlock !== 'default')) expect(ids).not.toContain(u.id);

@@ -1,6 +1,6 @@
 // Deterministic paper model behind design/mechanics/balance.md. Every assumption is a named constant.
 // These are MODELLED numbers, to be replaced by playtest telemetry. data.test.ts asserts the targets.
-import { BASE_STATS, BOSSES, ENEMIES, EVENTS, PROGRESSION, RUN_LENGTH_SEC, STAT_LIMITS, WAVES } from './index';
+import { BASE_STATS, BOSSES, ENEMIES, EVENTS, RUN_LENGTH_SEC, STAT_LIMITS, WAVES } from './index';
 import { hitDamage, runStardust, xpToNext } from './formulas';
 import type { EnemyDef, WaveDef } from './types';
 
