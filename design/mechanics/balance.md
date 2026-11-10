@@ -1,6 +1,7 @@
 # Balance: targets and the calculations behind them
 
-All numbers here are **modelled**, not measured. The executable model is `src/data/balanceModel.ts`, and the targets
+All numbers here are **modelled**, not measured, except §4 (XP pacing), which since 2026-11-10 runs on rates measured from
+the headless competent bot (M1), and §8 (P1-P3, Gear's harness). The executable model is `src/data/balanceModel.ts`, and the targets
 are asserted in `src/data/data.test.ts`, so changing a data value that breaks a target fails CI. Replace assumptions
 with telemetry after the first playtest (median time-of-death, boss kill times, level-up gaps, stardust per run).
 
@@ -8,7 +9,8 @@ with telemetry after the first playtest (median time-of-death, boss kill times, 
 
 | Id | Assumption | Value | Why / how to confirm |
 |---|---|---|---|
-| A1 | A median player kills about as fast as enemies spawn (steady state, below maxAlive) | kill rate = spawn rate | Typical for the genre at these densities; telemetry: alive-count p50 per wave < 60% of maxAlive |
+| A1 | A median player kills about as fast as enemies spawn (steady state, below maxAlive) | kill rate = spawn rate | **Disproven by M1**: the competent bot kills ≈ 0.29/s, about 10-20% of spawnPerSec. No longer used for XP (§4). §1 (hearts) and §5 (stardust pickups) still use it and overestimate; see the open items in §4 |
+| M1 | Competent player's kill rate and collected XP per kill, per minute | `MEASURED_PACING` in balanceModel.ts; run avg 0.29 kills/s × 1.73 XP/kill = 0.51 XP/s | Measured: bot, seeds 1-10, first run. Re-measure: `PACING_PROBE=1 npx vitest run src/data/pacingProbe.test.ts` |
 | A2 | Share of dropped XP collected | 85% | pickupRadius 90 + homing; telemetry: XP collected / dropped |
 | A3 | Median boss kill time on runs 3+ | Warden 41 s, Hive 55 s, Eclipse 54 s | §2 below |
 | A4 | Share of stardust pickups collected | 80% | 30 s lifetime |
@@ -58,23 +60,64 @@ Worst-case secondary damage per crit: chain 3 × 50% + explosion 60% = +210% of 
 (behaviors.md). Worst-case orb count is 3 (Twin + Binary Star) at mass ≥ 0.4.
 Positive loops and their caps: XP → power (STAT_LIMITS, hpMul ramp to 3.2); kills → more kills (maxAlive, hardEnemyCap 220).
 
-## 4. A level-up every 20-40 seconds
+## 4. A level-up every 20-40 seconds (measured, 2026-11-10)
 
-XP/s at time t = `spawnPerSec × avg XP per kill (including split children) × 0.85` (A1, A2), plus event and boss XP lumps
-and Hive brood XP. The XP table (`xpForLevel`) was fitted against this curve.
+**Why it changed.** The old model (A1 + A2) predicted 0.7-9.3 XP/s. Gear's competent bot collected 0.17-0.65 XP/s
+(0.36 average), so the median level-up gap was **53 s** (44-137 s per seed). Two causes:
+- The bot kills about 0.3 enemies/s, 10-20% of what spawns.
+- It never kills Warden or Hive (they warp out after 120 s), so the boss XP lumps never arrive.
 
-| t (s) | 0 | 45 | 90 | 150 | 200 | 270 | 330 | 390 | 450 | 510 | 570 |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| XP/s | 0.68 | 1.27 | 1.90 | 3.40 | 2.98 | 4.31 | 6.76 | 5.10 | 7.93 | 9.29 | 2.72 |
+The model now uses M1: XP/s at t = `killsPerSec(minute) × xpPerKill(minute)`.
 
-Modelled level-up times: 15, 36, 58, 80, 101, 130, 155, 180, 218, 239, 273, 302, 328, 352, 390, 416, 443, 471, 501, 528 s.
-Gaps: 21 22 22 21 29 25 25 **39** 21 34 29 26 25 **38** 26 27 28 30 27. The two longest gaps are the Warden and Hive
-fights, deliberately calmer and covered by the boss XP lump. **All gaps 21-39 s: met.** The first level-up comes at 15 s,
-so the draft is taught early. During the Eclipse fight (after 528 s) there is ≤ 1 more level-up, which is intentional:
-focus on the finale. *(Automated test: every pre-540 s gap is in [20, 40].)*
+| Lever | Old → new | One-line calculation |
+|---|---|---|
+| `xpForLevel` | 10, 18, 28, 40, 54, 70, 85, 100, … 430 (+15/level) → **5, 9, 12, 14, 16, 17, 18, … 41 (+1/level)** | Early: 0.83 XP/s at 1:00-2:00 × 20 s ≈ 17 XP, so levels 2-6 cost 5-16. Mid: 0.47 XP/s at 3:00-9:00 × 40 s ≈ 19 XP, so levels 8-15 cost 19-26 |
+| `xpOverflowStep` | 15 → **2** | Keeps the step past level 31 in proportion to the new +1/level slope (41, 43, 45, …), still strictly increasing |
+| Enemy `xp` | dart 2→**3**, wisp 2→**3**, blob 3→**5**, spitter 3→**5**, brute 8→**14** (mite 1, blobling 1 unchanged) | These are most of the mix after 2:00. Measured mid-game XP/s (3:00-9:00) went from 0.27 → 0.46, while the first 30 s (mites only) stays at 0.17 |
+| Boss `xp` | Warden 80 → **45**, Hive 150 → **90** | A modelled player is level 8 at 3:00 (cost 19 + 20 = 39 ≤ 45), so 2 drafts. At 6:00 they are level 12 (23 + 24 + 25 = 72 ≤ 90), so 3 drafts. At the old values, a kill would have given 4-6 drafts in a row |
 
-Sensitivity: A2 ±10 points shifts every gap by about ±12%, so the 39 s gaps would become 44 s at 75% collection. The first
-tuning knobs if telemetry shows long gaps: Warden xp 80 → 100, and the 3:00-4:00 spawnPerSec 1.5 → 1.7.
+**Measured result (competent bot, seeds 1-10, first run, no unlocks):**
+
+| Minute | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| kills/s | 0.41 | 0.54 | 0.37 | 0.13 | 0.25 | 0.21 | 0.16 | 0.34 | 0.19 | 0.34 |
+| XP/kill | 0.79 | 1.54 | 1.36 | 3.45 | 1.54 | 2.28 | 2.86 | 1.34 | 2.66 | 2.17 |
+| XP/s | 0.32 | 0.83 | 0.50 | 0.45 | 0.39 | 0.49 | 0.45 | 0.46 | 0.52 | 0.75 |
+| mean gap (s) | 17 | 17 | 31 | 34 | 46 | 50 | 29 | 83 | 47 | 49 |
+
+| Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Death | 9:39 | 10:19 | 9:32 | 9:39 | 9:46 | 9:32 | 9:22 | 9:46 | 7:36 | 10:03 |
+| Level | 12 | 16 | 21 | 17 | 15 | 14 | 21 | 16 | 15 | 15 |
+| Mean gap (s) | 54 | 40 | 28 | 34 | 43 | 37 | 27 | 40 | 33 | 37 |
+
+- **Median level-up gap: 22 s** pooled over all gaps (was 53 s). The median of the per-seed mean gaps is 37 s. **Met.**
+- Median survival **9:39** (was 7:33). **0/10** died before 3:00. **0/10** wins. 9/10 reached Eclipse (was 4/10), and all 9 died to it.
+- The model's average player (`levelUpTimes()`) reaches its first level at 16 s. Its median gap before 9:00 is 40 s and
+  its longest gap is 54 s. *(Automated: first draft ≤ 30 s, median gap 20-40 s, no gap over 75 s, at least 12 levels before 9:00.)*
+
+**The shape is still front-loaded.** Gaps are about 17 s in the first two minutes and 30-50 s after 3:00. The pooled median
+lands in the band because early gaps are numerous. XP/s drops during the boss windows (kills/s falls to 0.13-0.16 at 3:00 and 6:00),
+and `hpMul` keeps rising while XP per enemy does not. A strictly increasing curve can't fix both ends, because early
+needs about 21 XP per level and mid about 11. Next levers (they need sim code, so they are Gear's):
+1. A per-wave `xpMul` (for example `√hpMul`) so XP scales with enemy toughness.
+2. Bosses drip part of their XP at 25% HP thresholds, so a fight that ends with the boss warping out still pays a draft.
+
+**Survival check.** More drafts made the bot sturdier: 9/10 now reach the finale on a first run with no unlocks. It still never
+wins, and the median stays under 10:00, so no boss HP was added. Confirm with human playtests that reaching Eclipse on run 1
+isn't too generous (§5 targets a first win on runs 5-10).
+
+**Hive stall check.** Farming the brood (1 XP/s in phase 1, 2.1 XP/s in phase 2, for 120 s at most) yields about 190 XP. Killing the Hive
+in about 55 s yields 90 + about 80 from the brood + about 30 from 65 s of normal waves, roughly 200 XP, plus 50 ✦ and a heart. Killing still wins.
+
+**Sensitivity.** Every curve entry ±10% moves every gap by about ±10%. The mid-game XP/kill (blob and spitter values) is the most sensitive
+input after 3:00. A human who reels well kills faster than the bot: at 2× the bot's kill rate, the gaps halve (8-25 s), and the curve's
++1/level slope only partly absorbs that. Measure with playtest telemetry (level-up gap p50 by minute).
+
+**Open items from M1** (outside this change):
+- §1 assumes about 510 kills by 5:00. The measured figure is about 100, so about 0.5 hearts drop, not 2.8.
+- §5 models about 30 stardust pickups in a 10-minute run. At the measured kill rate it is about 3, so about 130 ✦ less per full run, roughly 20-25% of a win's income.
+  Re-derive both before the store prices are final.
 
 ## 5. Stardust: first unlock after about 2 runs, everything after 15-20 runs, first win by run 5-10
 
@@ -114,7 +157,7 @@ Per run: `secondsSurvived/60 × 10 + bosses × 50 + win × 150 + pickups × 5` (
 1. `critSpeed` (900): moves the crit share (A7), which drives every boss time. ±100 ≈ ±25% boss time.
 2. `reelRatio` (0.5): the reel multiplier `1/r`. 0.45 would make crits trivial from 410 px/s.
 3. `WAVES[].hpMul`: the late-game tension curve.
-4. `xpForLevel`: draft cadence (§4).
+4. `xpForLevel` and enemy `xp`: draft cadence (§4, measured). ±10% on the curve ≈ ±10% on every gap.
 5. `PROGRESSION.stardust.perMinuteSurvived`: meta pace (§5).
 6. `minDamageSpeed` and `PHYSICS.orbDrag`: the new-player passive floor (§8).
 

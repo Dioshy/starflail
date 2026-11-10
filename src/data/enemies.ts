@@ -13,13 +13,13 @@ export const MOBS: EnemyDef[] = [
   },
   {
     id: 'dart', name: 'Dart', ai: 'dasher',
-    hp: 30, speed: 90, radius: 12, contactDamage: 1, mass: 1, xp: 2, stardustChance: 0.02,
+    hp: 30, speed: 90, radius: 12, contactDamage: 1, mass: 1, xp: 3, stardustChance: 0.02,
     tell: 'Glows, then dashes in a straight line. Step sideways.',
     params: { triggerRange: 190, telegraphSec: 0.7, dashSpeed: 600, dashSec: 0.35, cooldownSec: 3 },
   },
   {
     id: 'wisp', name: 'Wisp', ai: 'orbiter',
-    hp: 25, speed: 140, radius: 10, contactDamage: 1, mass: 0.8, xp: 2, stardustChance: 0.02,
+    hp: 25, speed: 140, radius: 10, contactDamage: 1, mass: 0.8, xp: 3, stardustChance: 0.02,
     tell: 'Circles out of reach, then lunges. Swing through its orbit.',
     params: {
       orbitRadius: 260, orbitAngularSpeed: 0.55, telegraphSec: 0.6, lungeSpeed: 520, lungeSec: 0.55,
@@ -28,7 +28,7 @@ export const MOBS: EnemyDef[] = [
   },
   {
     id: 'blob', name: 'Blob', ai: 'splitter',
-    hp: 60, speed: 70, radius: 22, contactDamage: 1, mass: 3, xp: 3, stardustChance: 0.03,
+    hp: 60, speed: 70, radius: 22, contactDamage: 1, mass: 3, xp: 5, stardustChance: 0.03,
     splitInto: 'blobling', splitCount: 2,
     tell: 'Splits in two when popped.',
     params: { splitSpreadPx: 26, splitImpulse: 220, splitInvulnSec: 0.2 },
@@ -41,7 +41,7 @@ export const MOBS: EnemyDef[] = [
   },
   {
     id: 'spitter', name: 'Spitter', ai: 'shooter',
-    hp: 35, speed: 100, radius: 14, contactDamage: 1, mass: 1.2, xp: 3, stardustChance: 0.04,
+    hp: 35, speed: 100, radius: 14, contactDamage: 1, mass: 1.2, xp: 5, stardustChance: 0.04,
     tell: 'Keeps its distance and spits. Your orb swats spit out of the air.',
     params: {
       keepDistance: 380, distanceTolerance: 60, telegraphSec: 0.6, fireIntervalSec: 2.5,
@@ -50,7 +50,7 @@ export const MOBS: EnemyDef[] = [
   },
   {
     id: 'brute', name: 'Brute', ai: 'tank',
-    hp: 220, speed: 55, radius: 30, contactDamage: 2, mass: 6, xp: 8, stardustChance: 0.15,
+    hp: 220, speed: 55, radius: 30, contactDamage: 2, mass: 6, xp: 14, stardustChance: 0.15,
     tell: 'Armoured: slow hits clang off. Reel for speed. Winds up before charging.',
     params: {
       knockbackResist: 0.7, armorSpeed: 450, armorDamageMul: 0.25,
@@ -62,7 +62,7 @@ export const MOBS: EnemyDef[] = [
 export const BOSSES: EnemyDef[] = [
   {
     id: 'warden', name: 'The Warden', ai: 'boss',
-    hp: 4000, speed: 80, radius: 56, contactDamage: 2, mass: 40, xp: 80, stardustChance: 1,
+    hp: 4000, speed: 80, radius: 56, contactDamage: 2, mass: 40, xp: 45, stardustChance: 1,
     tell: 'Bait its charge into the wall, then punish.',
     params: {
       knockbackResist: 0.95,
@@ -74,7 +74,7 @@ export const BOSSES: EnemyDef[] = [
   },
   {
     id: 'hive', name: 'The Hive', ai: 'boss',
-    hp: 7500, speed: 40, radius: 72, contactDamage: 2, mass: 60, xp: 150, stardustChance: 1,
+    hp: 7500, speed: 40, radius: 72, contactDamage: 2, mass: 60, xp: 90, stardustChance: 1,
     summon: 'blobling',
     tell: 'Spawns broods and fires fans. Kill the brood with momentum, then dive.',
     params: {

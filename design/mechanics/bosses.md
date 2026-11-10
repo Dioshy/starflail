@@ -21,7 +21,7 @@ Fight-length targets (balance.md §2): 30-60 s for a median player on runs 3+; 6
 | Field | Spec |
 |---|---|
 | Purpose | First skill check: **bait, dodge, punish**. Teaches that the arena wall is a weapon against the boss. |
-| Stats | hp 4 000, speed 80, radius 56, contact 2, mass 40, xp 80, knockbackResist 0.95. |
+| Stats | hp 4 000, speed 80, radius 56, contact 2, mass 40, xp 45, knockbackResist 0.95. |
 | Pattern A: Ring Burst | Every 5 s. Telegraph 0.8 s (body ring glows, 16 tick marks show the projectile lanes), then fire 16 projectiles radially at 220 px/s. Gaps between projectiles at 300 px from the boss = 2π×300/16 ≈ 118 px, wider than the ship (28 px). |
 | Pattern B: Charge | Every 7 s. Telegraph 1.0 s (a red lane 56 px wide from the boss toward the ship, locked), then charge 650 px/s for 0.7 s (455 px). **If it hits the arena wall** during the charge: stunned 2 s and takes ×1.5 damage (a "STUNNED" label above it). |
 | Phase 2 (≤ 50%) | Rings get 24 projectiles (gap ≈ 79 px at 300 px), each ring rotated 7.5° from the last; intervals × 0.75 (ring 3.75 s, charge 5.25 s). |
@@ -34,13 +34,13 @@ Fight-length targets (balance.md §2): 30-60 s for a median player on runs 3+; 6
 | Field | Spec |
 |---|---|
 | Purpose | Crowd plus boss: **prioritise**. Clear the brood with sweeping swings, then dive the core. |
-| Stats | hp 7 500, speed 40, radius 72, contact 2, mass 60, xp 150, summon blobling. |
+| Stats | hp 7 500, speed 40, radius 72, contact 2, mass 60, xp 90, summon blobling. |
 | Pattern A: Brood | Every 6 s. Telegraph 0.8 s (6 sacs on its rim pulse), then spawn 6 bloblings at the rim (hp × current wave hpMul), skipped if 18 summons are alive. |
 | Pattern B: Volley | Every 4 s. Telegraph 0.7 s (a 50° cone flashes toward the ship, locked), then 5 projectiles spread evenly over 50° at 300 px/s. |
 | Phase 2 (≤ 50%) | Brood 9; intervals × 0.7 (brood 4.2 s, volley 2.8 s). |
 | Edge cases | Summons alive when the Hive dies: they stay (normal enemies). Summons alive when the Hive leaves at 120 s: they stay. Volley and Brood due together: Brood first (one at a time). Bloblings give 1 XP and 0 stardust. |
 | Tests | Given 18 summons alive, when Brood is due, then nothing spawns (the telegraph still plays so the rhythm stays readable). Given a volley, then 5 projectiles at angles −25°, −12.5°, 0°, 12.5°, 25° from the locked aim. |
-| Dominant-strategy review | **Stalling to farm the brood**: at most about 2 XP/s for ≤ 120 s, with 0 stardust, versus killing it (150 XP + 50 stardust + a heart). Killing is better, so stalling isn't dominant. |
+| Dominant-strategy review | **Stalling to farm the brood**: 1 XP/s (phase 1) or 2.1 XP/s (phase 2) for ≤ 120 s, so at most about 190 XP and 0 stardust. Killing it in about 55 s gives 90 + about 80 brood XP + about 30 XP from the extra 65 s of waves, roughly 200 XP, plus 50 stardust and a heart. Killing is better, so stalling isn't dominant (balance.md §4). |
 
 ## Eclipse (`eclipse`, 9:00, final)
 

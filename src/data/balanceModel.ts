@@ -1,19 +1,45 @@
 // Deterministic paper model behind design/mechanics/balance.md. Every assumption is a named constant.
-// These are MODELLED numbers, to be replaced by playtest telemetry. data.test.ts asserts the targets.
+// XP pacing (M1) is MEASURED from the headless competent bot; the rest is MODELLED until playtest telemetry.
+// data.test.ts asserts the targets.
 import { BASE_STATS, BOSSES, ENEMIES, EVENTS, RUN_LENGTH_SEC, STAT_LIMITS, WAVES } from './index';
 import { hitDamage, runStardust, xpToNext } from './formulas';
 import type { EnemyDef, WaveDef } from './types';
 
 export const ASSUMPTIONS = {
-  /** A1: a median player kills about as fast as the director spawns (steady state). */
+  /** A1 (old): a median player kills about as fast as the director spawns. DISPROVEN by the headless bot
+   *  (it kills ~10-20% of spawns). Kept only for the stardust model (balance.md §5), which still uses it. */
   killRateOfSpawn: 1,
-  /** A2: share of dropped XP actually collected. */
+  /** A2: share of dropped stardust/XP actually collected (stardust model only). */
   xpCollection: 0.85,
   /** A3: seconds a median run-3+ player needs to kill each boss (balance.md section 2). */
   bossKillSec: { warden: 41, hive: 55, eclipse: 54 } as Record<string, number>,
   /** A4: share of stardust pickups collected. */
   stardustCollection: 0.8,
 } as const;
+
+/**
+ * M1: MEASURED pacing of the competent headless bot (src/game/bot.ts, seeds 1-10, first run, no unlocks),
+ * with the xpForLevel curve and enemy XP of 2026-11-10. One row per minute of run time, pooled over the runs
+ * still alive. `killsPerSec` counts every kill (split children included); `xpPerKill` is XP actually
+ * collected per kill (after xpGain, mote losses and the enemy mix; bosses were never killed).
+ * Re-measure with `PACING_PROBE=1 npx vitest run src/data/pacingProbe.test.ts` whenever enemy XP, waves or
+ * the bot change. The bot's rate depends on its level, so the curve and this table are fitted together.
+ */
+export const MEASURED_PACING: { fromSec: number; killsPerSec: number; xpPerKill: number }[] = [
+  { fromSec: 0, killsPerSec: 0.41, xpPerKill: 0.79 },
+  { fromSec: 60, killsPerSec: 0.54, xpPerKill: 1.54 },
+  { fromSec: 120, killsPerSec: 0.37, xpPerKill: 1.36 },
+  { fromSec: 180, killsPerSec: 0.13, xpPerKill: 3.45 },
+  { fromSec: 240, killsPerSec: 0.25, xpPerKill: 1.54 },
+  { fromSec: 300, killsPerSec: 0.21, xpPerKill: 2.28 },
+  { fromSec: 360, killsPerSec: 0.16, xpPerKill: 2.86 },
+  { fromSec: 420, killsPerSec: 0.34, xpPerKill: 1.34 },
+  { fromSec: 480, killsPerSec: 0.19, xpPerKill: 2.66 },
+  { fromSec: 540, killsPerSec: 0.34, xpPerKill: 2.17 },
+];
+
+/** Whole-run averages from the same measurement (balance.md §4). */
+export const MEASURED_RUN = { killsPerSec: 0.29, xpPerKill: 1.73, xpPerSec: 0.51 } as const;
 
 const byId = new Map<string, EnemyDef>(ENEMIES.map((e) => [e.id, e]));
 
@@ -39,25 +65,11 @@ export function waveAt(t: number): WaveDef {
   return WAVES.find((w) => t >= w.fromSec && t < w.toSec) ?? WAVES[WAVES.length - 1];
 }
 
-/** Expected XP per second at time t from wave spawns (A1, A2). */
+/** Expected collected XP per second at time t for a competent player (M1: measured kill rate x XP per kill). */
 export function xpRateAt(t: number, xpGain = 1): number {
-  const w = waveAt(t);
-  const waveXp = w.spawnPerSec * ASSUMPTIONS.killRateOfSpawn * mixAvg(w, xpPerKill);
-  return (waveXp + summonXpRateAt(t)) * ASSUMPTIONS.xpCollection * xpGain;
-}
-
-/** XP/s from boss summons (hive broods) while that boss is alive, phase 1 rate (conservative). */
-export function summonXpRateAt(t: number): number {
-  let rate = 0;
-  for (const ev of EVENTS) {
-    if (ev.type !== 'boss') continue;
-    const boss = byId.get(ev.enemy)!;
-    const fight = ASSUMPTIONS.bossKillSec[ev.enemy] ?? 0;
-    if (!boss.summon || t < ev.atSec || t >= ev.atSec + fight) continue;
-    const p = boss.params;
-    rate += ((p.broodCount ?? 0) / (p.broodIntervalSec ?? Infinity)) * xpPerKill(boss.summon);
-  }
-  return rate;
+  let row = MEASURED_PACING[0];
+  for (const r of MEASURED_PACING) if (t >= r.fromSec) row = r;
+  return row.killsPerSec * row.xpPerKill * xpGain;
 }
 
 /** One-off XP lumps: event spawns at their time, bosses when killed (A3). */
@@ -70,9 +82,12 @@ export function xpLumps(): { t: number; xp: number }[] {
   });
 }
 
-/** Times (s) at which a median player reaches level 2, 3, ... within `untilSec`. */
-export function levelUpTimes(untilSec = RUN_LENGTH_SEC, xpGain = 1): number[] {
-  const lumps = xpLumps();
+/**
+ * Times (s) at which a competent player reaches level 2, 3, ... within `untilSec` (M1).
+ * `withBossKills` adds the Warden/Hive XP lumps at A3 (a player who kills bosses; the bot never did).
+ */
+export function levelUpTimes(untilSec = RUN_LENGTH_SEC, xpGain = 1, withBossKills = false): number[] {
+  const lumps = withBossKills ? xpLumps().filter((l, i) => EVENTS[i].type === 'boss') : [];
   const times: number[] = [];
   let level = 1;
   let xp = 0;
@@ -87,6 +102,11 @@ export function levelUpTimes(untilSec = RUN_LENGTH_SEC, xpGain = 1): number[] {
     }
   }
   return times;
+}
+
+/** Gaps between consecutive level-ups (s). */
+export function levelUpGaps(times: number[]): number[] {
+  return times.slice(1).map((t, i) => t - times[i]);
 }
 
 /** Expected stardust pickups dropped up to time t (A1, A4). */

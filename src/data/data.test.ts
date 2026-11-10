@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BASE_STATS, BOSSES, COSMETICS, META_UNLOCKS, ORBS, PROGRESSION, SHIPS, STAT_LIMITS, UPGRADES,
+  BASE_STATS, BOSSES, COSMETICS, ENEMIES, EVENTS, META_UNLOCKS, ORBS, PROGRESSION, SHIPS, STAT_LIMITS, UPGRADES,
   computeStats, eligibleUpgrades, hitDamage, reelSpeed, rollDraft, runStardust, xpMotes, xpToNext,
 } from './index';
 import type { StatKey, StatMod } from './index';
 import { validateData } from './validate';
 import {
-  MEDIAN_PLAYER_RUNS, PASSIVE_SWING, cumulativeStardust, levelUpTimes, passiveSpeedAtDrag, passiveSwingFloor, worstCaseHit,
+  MEDIAN_PLAYER_RUNS, PASSIVE_SWING, cumulativeStardust, levelUpGaps, levelUpTimes, MEASURED_PACING, MEASURED_RUN, passiveSpeedAtDrag, passiveSwingFloor, worstCaseHit,
 } from './balanceModel';
 
 /** Seeded PRNG (mulberry32) so draft tests are reproducible. */
@@ -83,25 +83,39 @@ describe('damage and crit', () => {
 
 describe('xp', () => {
   it('xpToNext follows the table then grows by xpOverflowStep', () => {
-    expect(xpToNext(1)).toBe(10);
+    expect(xpToNext(1)).toBe(PROGRESSION.xpForLevel[0]);
     const n = PROGRESSION.xpForLevel.length;
     expect(xpToNext(n)).toBe(PROGRESSION.xpForLevel[n - 1]);
-    expect(xpToNext(n + 1)).toBe(PROGRESSION.xpForLevel[n - 1] + 15);
+    expect(xpToNext(n + 1)).toBe(PROGRESSION.xpForLevel[n - 1] + PROGRESSION.xpOverflowStep!);
+    expect(xpToNext(n + 2)).toBeGreaterThan(xpToNext(n + 1));
   });
   it('splits xp into big and small motes', () => {
     expect(xpMotes(8)).toEqual({ xpBig: 1, xpSmall: 3 });
     expect(xpMotes(0)).toEqual({ xpBig: 0, xpSmall: 0 });
   });
-  it('modelled median run levels up every 20-40 s before the Eclipse fight', () => {
-    const t = levelUpTimes();
-    expect(t[0]).toBeLessThanOrEqual(20);
-    const preEclipse = t.filter((x) => x < 540);
-    for (let i = 1; i < preEclipse.length; i++) {
-      const gap = preEclipse[i] - preEclipse[i - 1];
-      expect(gap, `gap before level ${i + 2}`).toBeGreaterThanOrEqual(20);
-      expect(gap, `gap before level ${i + 2}`).toBeLessThanOrEqual(40);
+  it('measured-rate model: median level-up gap 20-40 s before Eclipse, first draft by 30 s, no gap over 75 s', () => {
+    const t = levelUpTimes().filter((x) => x < 540);
+    const gaps = levelUpGaps(t);
+    const median = [...gaps].sort((a, b) => a - b)[gaps.length >> 1];
+    expect(t[0]).toBeLessThanOrEqual(30);
+    expect(median).toBeGreaterThanOrEqual(20);
+    expect(median).toBeLessThanOrEqual(40);
+    expect(Math.max(...gaps)).toBeLessThanOrEqual(75);
+    expect(t.length).toBeGreaterThanOrEqual(12);
+  });
+  it('measured-rate table matches the whole-run average it came from', () => {
+    const rate = MEASURED_PACING.reduce((s, r) => s + r.killsPerSec * r.xpPerKill, 0) / MEASURED_PACING.length;
+    expect(rate).toBeCloseTo(MEASURED_RUN.xpPerSec, 1);
+  });
+  it('a boss kill is worth 1-4 drafts at the level a competent player has when it spawns', () => {
+    for (const id of ['warden', 'hive']) {
+      const ev = EVENTS.find((e) => e.enemy === id)!;
+      const level = 1 + levelUpTimes(ev.atSec).length;
+      let xp = ENEMIES.find((e) => e.id === id)!.xp, lv = level;
+      while (xp >= xpToNext(lv)) { xp -= xpToNext(lv); lv++; }
+      expect(lv - level, id).toBeGreaterThanOrEqual(1);
+      expect(lv - level, id).toBeLessThanOrEqual(4);
     }
-    expect(t.length).toBeGreaterThanOrEqual(18);
   });
 });
 
