@@ -1,4 +1,3 @@
-import { SaveEntitlements } from './entitlements';
 import { ItchProvider } from './itch';
 import { MockProvider } from './mock';
 import { CrazyGamesProvider, PokiProvider } from './portal';
