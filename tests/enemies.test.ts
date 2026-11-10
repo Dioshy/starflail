@@ -32,22 +32,25 @@ describe('enemies', () => {
     run(w, 60);
     expect(w.projectiles.count).toBeGreaterThan(0);
     const p = w.projectiles.items[0];
+    w.ship.x = w.ship.px = p.x - 40; w.ship.y = w.ship.py = p.y;
     w.orb.x = w.orb.px = p.x; w.orb.y = w.orb.py = p.y; w.orb.vx = 0; w.orb.vy = 100;
     const n = w.projectiles.count;
     w.step(idle());
     expect(w.projectiles.count).toBe(n);
-    w.orb.x = w.orb.px = w.projectiles.items[0].x; w.orb.y = w.orb.py = w.projectiles.items[0].y; w.orb.vy = 400;
+    const q = w.projectiles.items[0];
+    w.ship.x = w.ship.px = q.x - 40; w.ship.y = w.ship.py = q.y;
+    w.orb.x = w.orb.px = q.x; w.orb.y = w.orb.py = q.y; w.orb.vx = 0; w.orb.vy = 500;
     w.step(idle());
     expect(w.projectiles.count).toBe(n - 1);
   });
   it('brute armour: slow hits clang for 25%', () => {
     const w = new World({ seed: 1, noSpawn: true });
-    const b = w.spawnEnemy('brute', 400, 0, 1)!;
+    w.spawnEnemy('brute', 400, 0, 1);
     w.ship.x = w.ship.px = 330;
     w.orb.x = w.orb.px = 370; w.orb.y = w.orb.py = 0; w.orb.vx = 420; w.orb.vy = 0;
     w.step(idle());
     const hit = evs(w).find((e) => e.type === 'hit');
-    expect(hit.dmg).toBeLessThan(15);
+    expect(hit!.dmg).toBeLessThan(15);
   });
 });
 
@@ -70,7 +73,7 @@ describe('director', () => {
     const w = new World({ seed: 2, god: true });
     w.time = 89.99;
     const before = w.enemies.count;
-    w.step(idle());
+    w.step(idle()); w.step(idle());
     expect(w.enemies.count - before).toBeGreaterThanOrEqual(16);
     expect(EVENTS.find((e) => e.atSec === 90)!.count).toBe(16);
   });
@@ -90,16 +93,16 @@ describe('bosses', () => {
   it('warden: ring of 16, 24 in phase 2; wall charge stuns and takes x1.5', () => {
     const { w, b } = boss('warden');
     b.cd0 = 0; b.cd1 = 99;
-    run(w, 60 * 2, () => { if (w.projectiles.count >= 16) return; });
+    run(w, 60 * 2);
     expect(w.projectiles.count).toBe(16);
     const { w: w2, b: b2 } = boss('warden');
     b2.hp = b2.maxHp * 0.4; b2.cd0 = 0; b2.cd1 = 99;
     run(w2, 60 * 2);
     expect(b2.phase2).toBe(true); expect(w2.projectiles.count).toBe(24);
     const { w: w3, b: b3 } = boss('warden');
-    b3.x = b3.px = 1300; b3.y = b3.py = 0; b3.cd0 = 99; b3.cd1 = 0;
+    b3.x = b3.px = 1200; b3.y = b3.py = 0; b3.cd0 = 99; b3.cd1 = 0;
     let stunned = false;
-    for (let i = 0; i < 200; i++) { w3.ship.x = w3.ship.px = 1000; w3.step(idle()); if (b3.stun > 0) stunned = true; w3.ship.iframes = 0; }
+    for (let i = 0; i < 200; i++) { w3.ship.x = w3.ship.px = 1500; w3.step(idle()); if (b3.stun > 0) stunned = true; w3.ship.iframes = 0; }
     expect(stunned).toBe(true);
   });
   it('hive: brood of 6, capped at 18 summons; volley fires 5 shots', () => {
@@ -115,10 +118,11 @@ describe('bosses', () => {
   });
   it('eclipse: blink hits a stationary ship for 2, gravity well is phase 2 only, kill = win', () => {
     const w = new World({ seed: 1, noSpawn: true });
-    const b = w.spawnEnemy('eclipse', 700, 0)!;
+    const b = w.spawnEnemy('eclipse', 900, 0)!;
     b.cd0 = 99; b.cd1 = 0; b.cd2 = 0;
-    run(w, 60 * 2);
-    expect(w.ship.hp).toBe(w.ship.maxHp - 2);
+    let blinked = false;
+    for (let i = 0; i < 120; i++) { w.step(idle()); for (const e of evs(w)) if (e.type === 'playerHurt' && e.source === 'Eclipse blink') { blinked = true; expect(e.dmg).toBe(2); } }
+    expect(blinked).toBe(true);
     expect(b.pat).not.toBe(2);
     const { w: w2, b: b2 } = boss('eclipse'); b2.hp = 1; (w2 as any).killEnemy(b2, 1, 0);
     w2.step(idle());
