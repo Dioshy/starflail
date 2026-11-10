@@ -1,4 +1,4 @@
-/** Logical view: height 720 on landscape (width follows the aspect up to 1600), width 720 on portrait (height up to 1400). */
+/** Logical view: height 720 on landscape (width follows the aspect up to 1600), width 720 on portrait (height up to 1600). */
 export const BASE = 720;
 
 /** DPR-aware canvas with a logical coordinate system that adapts to the window aspect ratio. */
@@ -30,7 +30,7 @@ export class Screen {
     this.canvas.height = Math.round(this.cssH * this.dpr);
     const aspect = this.cssW / this.cssH;
     if (aspect >= 1) { this.h = BASE; this.w = Math.min(1600, BASE * aspect); }
-    else { this.w = BASE; this.h = Math.min(1400, BASE / aspect); }
+    else { this.w = BASE; this.h = Math.min(1600, BASE / aspect); }
     this.scale = Math.min(this.cssW / this.w, this.cssH / this.h);
     this.offX = (this.cssW - this.w * this.scale) / 2;
     this.offY = (this.cssH - this.h * this.scale) / 2;

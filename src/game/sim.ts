@@ -6,7 +6,7 @@ import { SpatialHash } from '../core/spatialHash';
 import type { Intents } from '../core/input';
 import { STEP } from '../core/loop';
 import {
-  ARENA_RADIUS, BASE_STATS, DIRECTOR, ENEMIES, EVENTS, ORBS, PHYSICS, PICKUPS, PROGRESSION, SHIPS,
+  ARENA_RADIUS, BASE_STATS, DIRECTOR, ENEMIES, EVENTS, ORBS, PHYSICS, PICKUPS, PROGRESSION, SHIPS, UPGRADES,
   computeStats, eligibleUpgrades, hitDamage, rollDraft, runStardust, xpMotes, xpToNext,
 } from '../data';
 import type { AnyEnemyId, BehaviorId, EnemyDef, PhysicsDef, PickupId, StatMod, Stats, UpgradeDef } from '../data';
@@ -1144,13 +1144,23 @@ export class World {
       const fb = PROGRESSION.fallbackReward ?? { heal: 1, stardust: 10 };
       this.ship.hp = Math.min(this.ship.maxHp, this.ship.hp + fb.heal);
       this.bonusStardust += fb.stardust;
-    } else {
-      this.stacks[def.id] = (this.stacks[def.id] ?? 0) + 1;
-      this.mods.push(...def.mods);
-      if (def.behavior) { this.behaviors.set(def.behavior.id, def.behavior.params); this.events.push({ type: 'behavior', id: def.behavior.id }); }
-      this.recomputeStats();
-    }
+    } else this.applyUpgrade(def);
     this.events.push({ type: 'upgradePicked', id: card.id });
+    return true;
+  }
+
+  private applyUpgrade(def: UpgradeDef): void {
+    this.stacks[def.id] = (this.stacks[def.id] ?? 0) + 1;
+    this.mods.push(...def.mods);
+    if (def.behavior) { this.behaviors.set(def.behavior.id, def.behavior.params); this.events.push({ type: 'behavior', id: def.behavior.id }); }
+    this.recomputeStats();
+  }
+
+  /** Apply an upgrade directly (tests, debug cheats). Ignores locks; respects maxStacks. */
+  grantUpgrade(id: string): boolean {
+    const def = UPGRADES.find((u) => u.id === id);
+    if (!def || (this.stacks[id] ?? 0) >= def.maxStacks) return false;
+    this.applyUpgrade(def);
     return true;
   }
 

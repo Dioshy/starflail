@@ -210,7 +210,7 @@ export class Game {
     const w = this.world, sum = w.summary();
     const earned = w.stardustEarned();
     let rec = { newBest: false, banked: 0 };
-    if (!this.params.god && this.params.stress === 0) { // cheat/stress runs never touch the save
+    if (!this.params.god && this.params.stress === 0 && this.params.skipTo === 0) { // cheat/stress/skip runs never touch the save
       rec = recordRun(this.store.data, { timeSec: sum.secondsSurvived, kills: w.kills, bossKills: w.bossKills, won: sum.won, stardust: earned });
       this.store.commit(); this.store.flush(); // bank immediately: closing the tab never loses it
     }
