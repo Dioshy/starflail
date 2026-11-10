@@ -86,7 +86,7 @@ export interface RunSummary {
 export function runStardust(r: RunSummary): number {
   const p = PROGRESSION.stardust;
   const raw =
-    (Math.max(0, r.secondsSurvived) / 60) * p.perMinuteSurvived + // prorated per second
+    (Math.min(p.maxTimeSec, Math.max(0, r.secondsSurvived)) / 60) * p.perMinuteSurvived + // prorated per second
     r.bossKills * p.perBossKill +
     (r.won ? p.winBonus : 0) +
     r.stardustPickups * p.perPickup;

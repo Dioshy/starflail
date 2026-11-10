@@ -58,4 +58,9 @@ export const DIRECTOR: DirectorDef = {
   bossLeaveAfterSec: 120, // an unkilled warden/hive warps out (no reward); eclipse never leaves
   overtimeHpMulPer30s: 0.15, // after 600 s: hpMul += 0.15 every 30 s
   overtimeSpawnMulPer30s: 0.1, // after 600 s: spawnPerSec *= 1 + 0.1 every 30 s (cap maxAlive unchanged)
+  edgeZoneRadius: 1150, // beyond this (arena 1600) the director heats up: wall-hugging kiting is punished
+  edgeHeatSec: 8,
+  edgeCoolSec: 4,
+  edgeSpawnDistance: 320,
+  edgeSpawnMul: 2.5,
 };

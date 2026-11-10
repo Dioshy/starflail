@@ -93,6 +93,8 @@ export class World {
   hpMul = 1;
   private nextId = 1;
   private spawnAcc = 0;
+  /** 0..1 anti-kiting heat (DIRECTOR.edge*). */
+  edgeHeat = 0;
   private fired: boolean[] = EVENTS.map(() => false);
   private warned: boolean[] = EVENTS.map(() => false);
   private rush: { at: number; enemy: AnyEnemyId; ang: number }[] = [];
@@ -140,7 +142,7 @@ export class World {
     this.enemies.clear(); this.pickups.clear(); this.projectiles.clear(); this.events.length = 0;
     this.kills = 0; this.bossKills = 0; this.runPickups = 0; this.bonusStardust = 0; this.hitCount = 0; this.maxOrbSpeed = 0;
     this.outcome = null; this.killedBy = ''; this.endTime = 0; this.deadTime = 0;
-    this.nextId = 1; this.spawnAcc = 0; this.hpMul = 1;
+    this.nextId = 1; this.spawnAcc = 0; this.edgeHeat = 0; this.hpMul = 1;
     this.fired = EVENTS.map(() => false); this.warned = EVENTS.map(() => false); this.rush = []; this.bossWarning = null;
     this.stacks = {}; this.behaviors.clear(); this.level = 1; this.xp = 0; this.xpNext = xpToNext(1); this.pendingDrafts = 0;
     this.rerollsLeft = PROGRESSION.rerollsPerRun; this.draft = null; this.draftDefs = [];
@@ -1120,12 +1122,16 @@ export class World {
       if (e.alive && e.def.ai === 'boss' && e.kind !== 'eclipse' && e.age >= DIRECTOR.bossLeaveAfterSec) { e.alive = false; this.events.push({ type: 'bossLeft', boss: e.kind }); }
     }
     // continuous spawns
-    this.spawnAcc += aw.spawnPerSec * dt;
+    const D = DIRECTOR;
+    const outer = Math.hypot(this.ship.x, this.ship.y) > D.edgeZoneRadius;
+    this.edgeHeat = Math.max(0, Math.min(1, this.edgeHeat + (outer ? dt / D.edgeHeatSec : -dt / D.edgeCoolSec)));
+    this.spawnAcc += aw.spawnPerSec * (1 + (D.edgeSpawnMul - 1) * this.edgeHeat) * dt;
+    const spawnDist = D.spawnDistance + (D.edgeSpawnDistance - D.spawnDistance) * this.edgeHeat;
     let n = 0;
-    while (this.spawnAcc >= 1 && this.enemies.count < aw.maxAlive && this.canSpawn() && n < 6) {
+    while (this.spawnAcc >= 1 && this.enemies.count < aw.maxAlive * (1 + this.edgeHeat) && this.canSpawn() && n < 6) {
       this.spawnAcc -= 1; n++;
       const kind = pickMix(aw.wave, this.rngSpawn.next());
-      const pt = this.spawnPoint(this.def(kind).radius);
+      const pt = this.spawnPoint(this.def(kind).radius, spawnDist);
       this.spawnEnemy(kind, pt.x, pt.y);
     }
     if (this.spawnAcc > 3) this.spawnAcc = 3;
