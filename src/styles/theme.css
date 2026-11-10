@@ -1,0 +1,53 @@
+/* STARFLAIL theme. No external requests: system font stack only. */
+:root {
+  --bg-0: #050816; --bg-1: #0a1030; --bg-2: #111c52; --line: #2a3d9a;
+  --player: #35e6ff; --player-deep: #0a8fb3; --white: #f4fbff;
+  --text: #e8f1ff; --text-dim: #8fa0cf;
+  --danger: #ff4d5e; --warn: #ffb020; --good: #4dffc4; --gold: #ffd166;
+  --common: #8fa0cf; --rare: #4d9bff; --epic: #c07bff;
+  --radius: 12px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg-0); color: var(--text); font-family: var(--font); }
+
+.btn {
+  font: 700 15px var(--font); color: var(--text); background: rgba(17, 28, 82, .8);
+  border: 2px solid var(--line); border-radius: var(--radius); padding: 10px 18px; min-height: 44px;
+  cursor: pointer; transition: transform .08s, border-color .12s, box-shadow .12s;
+}
+.btn:hover { border-color: var(--player); box-shadow: 0 0 14px rgba(53, 230, 255, .35); }
+.btn:active { transform: scale(.97); }
+.btn:focus-visible { outline: 3px solid var(--white); outline-offset: 2px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.btn-primary { background: var(--player); color: #031018; border-color: var(--white); }
+.btn-primary:hover { box-shadow: 0 0 22px rgba(53, 230, 255, .7); border-color: var(--white); }
+
+.panel { background: linear-gradient(180deg, rgba(17, 28, 82, .85), rgba(10, 16, 48, .92)); border: 2px solid var(--line); border-radius: 16px; padding: 18px; box-shadow: 0 0 30px rgba(0, 0, 0, .5); }
+
+.card { --accent: var(--common); background: var(--bg-1); border: 2px solid var(--accent); border-radius: var(--radius); padding: 14px; box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent); }
+.card.common { --accent: var(--common); }
+.card.rare { --accent: var(--rare); }
+.card.epic { --accent: var(--epic); box-shadow: 0 0 22px color-mix(in srgb, var(--epic) 60%, transparent); }
+
+.price-tag { display: inline-block; font: 800 14px var(--font); color: #1a1200; background: var(--gold); border-radius: 999px; padding: 4px 12px; }
+
+.badge-supporter { display: inline-block; font: 800 11px var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--gold); border: 1.5px solid var(--gold); border-radius: 6px; padding: 2px 8px; background: rgba(255, 209, 102, .1); }
+
+/* .toggle: <label class="toggle"><input type="checkbox"><span></span></label> */
+.toggle { position: relative; display: inline-block; width: 48px; height: 28px; }
+.toggle input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+.toggle span { position: absolute; inset: 0; background: var(--bg-2); border: 2px solid var(--line); border-radius: 999px; transition: background .15s; }
+.toggle span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--text-dim); transition: transform .15s, background .15s; }
+.toggle input:checked + span { background: var(--player-deep); border-color: var(--player); }
+.toggle input:checked + span::after { transform: translateX(20px); background: var(--white); }
+.toggle input:focus-visible + span { outline: 3px solid var(--white); outline-offset: 2px; }
+
+/* .slider on <input type="range"> */
+.slider { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--line); outline: none; }
+.slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--player); border: 2px solid var(--white); cursor: pointer; }
+.slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--player); border: 2px solid var(--white); cursor: pointer; }
+.slider:focus-visible { outline: 3px solid var(--white); outline-offset: 4px; }
+
+@media (prefers-reduced-motion: reduce) { .btn, .toggle span, .toggle span::after { transition: none; } }

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>STARFLAIL art preview</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="../public/icons/favicon.svg">
+<link rel="stylesheet" href="../src/styles/theme.css">
+<style>
+ body{padding:12px;max-width:1160px;margin:0 auto}
+ h2{font-size:14px;color:var(--text-dim);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.1em}
+ canvas{display:block;border:1px solid var(--line);border-radius:8px;max-width:100%}
+ .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+ .row .btn{min-height:32px;padding:4px 10px;font-size:13px}
+ #ms{font:700 14px var(--mono);color:var(--good)}
+ .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+</style></head><body>
+<div class="row"><b style="font-size:18px">STARFLAIL art/audio preview</b><span id="ms">…</span>
+<label class="row">stress (400 enemies + 1000 particles) <span class="toggle"><input id="stress" type="checkbox"><span></span></span></label></div>
+<canvas id="gallery" width="1140" height="930"></canvas>
+<h2>FX</h2><div class="row" id="fxb"></div>
+<canvas id="fxc" width="1140" height="200"></canvas>
+<h2>SFX (click first to unlock audio)</h2><div class="row" id="sfxb"></div>
+<h2>Music</h2><div class="row"><button class="btn btn-primary" id="mstart">Start</button><button class="btn" id="mstop">Stop</button>
+<label>intensity <input id="int" class="slider" style="width:240px" type="range" min="0" max="1" step="0.05" value="0"></label>
+<button class="btn" id="sb">boss stinger</button><button class="btn" id="sv">victory</button><button class="btn" id="sd">defeat</button></div>
+<h2>Theme components</h2>
+<div class="grid3">
+ <div class="panel"><div class="row"><button class="btn">Button</button><button class="btn btn-primary">Play</button><button class="btn" disabled>Disabled</button></div>
+  <p class="row"><span class="price-tag">$2.99</span><span class="badge-supporter">Supporter</span></p>
+  <p class="row"><label class="toggle"><input type="checkbox" checked><span></span></label><input class="slider" type="range" style="width:150px"></p></div>
+ <div class="card common"><b>Heavy Chain</b><p>Tether +10% length.</p></div>
+ <div class="card rare"><b>Overspin</b><p>Reel spins 20% faster.</p></div>
+ <div class="card epic"><b>Singularity</b><p>Orb pulls enemies in.</p></div>
+</div>
+<script type="module" src="./art.ts"></script></body></html>
