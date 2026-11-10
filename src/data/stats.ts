@@ -8,7 +8,7 @@ export const BASE_STATS: Stats = {
   orbMass: 1,
   orbRadius: 18, // px
   tetherLength: 140, // px, rest length
-  tetherStiffness: 40, // spring k (1/s^2 per unit mass)
+  tetherStiffness: 40, // spring k: orb accel = k * stretch / orbMass (px/s^2 per px)
   reelRatio: 0.5, // reeled length = reelRatio * tetherLength (lower = stronger reel)
   damagePerSpeed: 0.08, // damage per px/s of orb speed
   minDamageSpeed: 250, // px/s; below this a hit only bumps

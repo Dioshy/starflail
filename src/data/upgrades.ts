@@ -7,7 +7,7 @@ import type { BehaviorId, UpgradeDef } from './types';
 /** Required numeric params per behavior. validate.ts checks every BehaviorRef against this. */
 export const BEHAVIOR_PARAMS: Record<BehaviorId, string[]> = {
   chainOnCrit: ['jumps', 'range', 'damagePct'],
-  tetherDamage: ['damage', 'hitCooldownSec'],
+  tetherDamage: ['damagePct', 'hitCooldownSec'],
   shockwaveOnReel: ['radius', 'damage', 'knockback', 'cooldownSec'],
   orbExplodeOnCrit: ['radius', 'damagePct', 'cooldownSec'],
   thorns: ['damage', 'knockback', 'cooldownSec'],
@@ -75,9 +75,9 @@ export const UPGRADES: UpgradeDef[] = [
       { stat: 'critSpeed', op: 'add', value: -50 },
     ] },
   { id: 'barbedLine', name: 'Barbed Line', rarity: 'rare', maxStacks: 1, unlock: 'default', tags: ['tether'],
-    description: 'The tether itself cuts: 10 damage to enemies it crosses (0.4 s per enemy). +10 px tether.',
+    description: 'The tether itself cuts enemies it crosses for 25% of your current orb hit (0.4 s per enemy). +10 px tether.',
     mods: [{ stat: 'tetherLength', op: 'add', value: 10 }],
-    behavior: { id: 'tetherDamage', params: { damage: 10, hitCooldownSec: 0.4 } } },
+    behavior: { id: 'tetherDamage', params: { damagePct: 0.25, hitCooldownSec: 0.4 } } },
   { id: 'nanorepair', name: 'Nanorepair', rarity: 'rare', maxStacks: 2, unlock: 'default', tags: ['defense'],
     description: 'Regenerate 0.5 HP per minute.',
     mods: [{ stat: 'regenPerMin', op: 'add', value: 0.5 }] },
