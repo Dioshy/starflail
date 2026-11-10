@@ -1,7 +1,8 @@
 // Pure helpers that turn data into numbers. Gear's sim should call these instead of re-deriving formulas.
 import { BASE_STATS, PHYSICS, STAT_LIMITS } from './stats';
 import { PROGRESSION } from './progression';
-import type { StatKey, StatMod, Stats } from './types';
+import { UPGRADES } from './upgrades';
+import type { BehaviorId, Rarity, StatKey, StatMod, Stats, UpgradeDef } from './types';
 
 const STAT_KEYS = Object.keys(BASE_STATS) as StatKey[];
 
@@ -90,4 +91,59 @@ export function runStardust(r: RunSummary): number {
     (r.won ? p.winBonus : 0) +
     r.stardustPickups * p.perPickup;
   return Math.floor(raw * clampStat('stardustGain', r.stardustGain));
+}
+
+export interface DraftContext {
+  /** META_UNLOCKS ids the player owns */
+  unlockedMeta: ReadonlySet<string>;
+  /** upgrade id -> stacks taken this run */
+  stacks: Readonly<Record<string, number>>;
+  /** all mods currently applied (ship + orb + upgrades) */
+  currentMods: readonly StatMod[];
+  /** behaviors already active from any source (orb or upgrades) */
+  activeBehaviors: ReadonlySet<BehaviorId>;
+}
+
+/**
+ * Upgrades that may be offered (upgrade-draft.md): unlocked, below maxStacks, behavior not already active,
+ * and not a no-op (every stat it touches already clamped).
+ */
+export function eligibleUpgrades(ctx: DraftContext, pool: readonly UpgradeDef[] = UPGRADES): UpgradeDef[] {
+  const now = computeStats(ctx.currentMods);
+  return pool.filter((u) => {
+    if (u.unlock !== 'default' && !ctx.unlockedMeta.has(u.unlock)) return false;
+    if ((ctx.stacks[u.id] ?? 0) >= u.maxStacks) return false;
+    if (u.behavior) return !ctx.activeBehaviors.has(u.behavior.id);
+    const next = computeStats([...ctx.currentMods, ...u.mods]);
+    return u.mods.some((m) => next[m.stat] !== now[m.stat]);
+  });
+}
+
+/**
+ * Pick up to `choices` distinct upgrades. Per slot: roll a rarity by weight among rarities that still have
+ * candidates, then pick uniformly within it. rng must return [0, 1) and come from the run's seeded stream.
+ */
+export function rollDraft(
+  rng: () => number,
+  eligible: readonly UpgradeDef[],
+  choices: number = PROGRESSION.upgradeChoices,
+  weights: Record<Rarity, number> = PROGRESSION.rarityWeights,
+): UpgradeDef[] {
+  const left = [...eligible];
+  const picked: UpgradeDef[] = [];
+  while (picked.length < choices && left.length > 0) {
+    const rarities = (Object.keys(weights) as Rarity[]).filter((r) => left.some((u) => u.rarity === r));
+    const total = rarities.reduce((s, r) => s + weights[r], 0);
+    let roll = rng() * total;
+    let rarity = rarities[rarities.length - 1];
+    for (const r of rarities) {
+      if (roll < weights[r]) { rarity = r; break; }
+      roll -= weights[r];
+    }
+    const bucket = left.filter((u) => u.rarity === rarity);
+    const choice = bucket[Math.min(bucket.length - 1, Math.floor(rng() * bucket.length))];
+    picked.push(choice);
+    left.splice(left.indexOf(choice), 1);
+  }
+  return picked;
 }
