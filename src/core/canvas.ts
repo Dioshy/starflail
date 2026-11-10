@@ -1,15 +1,18 @@
-export const LOGICAL_W = 1280;
-export const LOGICAL_H = 720;
+/** Logical view: height 720 on landscape (width follows the aspect up to 1600), width 720 on portrait (height up to 1400). */
+export const BASE = 720;
 
-/** Letterboxed, DPR-aware 1280x720 logical canvas. */
+/** DPR-aware canvas with a logical coordinate system that adapts to the window aspect ratio. */
 export class Screen {
   readonly ctx: CanvasRenderingContext2D;
+  /** logical size (what drawing code uses) */
+  w = 1280;
+  h = 720;
   scale = 1;
   offX = 0;
   offY = 0;
   dpr = 1;
-  cssW = LOGICAL_W;
-  cssH = LOGICAL_H;
+  cssW = 1280;
+  cssH = 720;
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d', { alpha: false });
@@ -21,16 +24,19 @@ export class Screen {
 
   resize(): void {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.cssW = window.innerWidth;
-    this.cssH = window.innerHeight;
+    this.cssW = Math.max(1, window.innerWidth);
+    this.cssH = Math.max(1, window.innerHeight);
     this.canvas.width = Math.round(this.cssW * this.dpr);
     this.canvas.height = Math.round(this.cssH * this.dpr);
-    this.scale = Math.min(this.cssW / LOGICAL_W, this.cssH / LOGICAL_H);
-    this.offX = (this.cssW - LOGICAL_W * this.scale) / 2;
-    this.offY = (this.cssH - LOGICAL_H * this.scale) / 2;
+    const aspect = this.cssW / this.cssH;
+    if (aspect >= 1) { this.h = BASE; this.w = Math.min(1600, BASE * aspect); }
+    else { this.w = BASE; this.h = Math.min(1400, BASE / aspect); }
+    this.scale = Math.min(this.cssW / this.w, this.cssH / this.h);
+    this.offX = (this.cssW - this.w * this.scale) / 2;
+    this.offY = (this.cssH - this.h * this.scale) / 2;
   }
 
-  /** Clears the bars, then sets up logical coordinates clipped to the 16:9 playfield. */
+  /** Clears the bars, then sets up logical coordinates clipped to the playfield. */
   begin(): void {
     const c = this.ctx;
     c.setTransform(1, 0, 0, 1, 0, 0);
@@ -39,15 +45,12 @@ export class Screen {
     const s = this.dpr * this.scale;
     c.setTransform(s, 0, 0, s, this.offX * this.dpr, this.offY * this.dpr);
     c.beginPath();
-    c.rect(0, 0, LOGICAL_W, LOGICAL_H);
+    c.rect(0, 0, this.w, this.h);
     c.clip();
   }
 
   toLogical(clientX: number, clientY: number): { x: number; y: number } {
     const r = this.canvas.getBoundingClientRect();
-    return {
-      x: (clientX - r.left - this.offX) / this.scale,
-      y: (clientY - r.top - this.offY) / this.scale,
-    };
+    return { x: (clientX - r.left - this.offX) / this.scale, y: (clientY - r.top - this.offY) / this.scale };
   }
 }

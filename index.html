@@ -4,16 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#05060f" />
+    <meta name="description" content="STARFLAIL: a neon arcade roguelite. You never shoot. You swing." />
     <title>STARFLAIL</title>
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
     <style>
-      /* minimal base styles; theme.css (optional) may override */
+      /* minimal base styles; theme.css + ui.css own the rest */
       html, body { margin: 0; height: 100%; background: #05060f; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
       canvas#game { display: block; width: 100vw; height: 100vh; outline: none; }
     </style>
     <link rel="stylesheet" href="/src/styles/theme.css" />
+    <link rel="stylesheet" href="/src/styles/ui.css" />
   </head>
   <body>
     <canvas id="game" tabindex="0"></canvas>
+    <div id="ui"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -106,7 +106,7 @@ describe('xp', () => {
 });
 
 describe('upgrade draft', () => {
-  const base = { unlockedMeta: new Set<string>(), stacks: {}, currentMods: [], activeBehaviors: new Set() } as const;
+  const base = { unlockedMeta: new Set<string>(), stacks: {}, currentMods: [], activeBehaviors: new Set<never>() } as const;
   it('given no meta unlocks, then locked upgrades are never eligible', () => {
     const ids = eligibleUpgrades(base).map((u) => u.id);
     for (const u of UPGRADES.filter((x) => x.unlock !== 'default')) expect(ids).not.toContain(u.id);

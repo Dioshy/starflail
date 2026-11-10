@@ -1,240 +1,385 @@
-import { LOGICAL_H, LOGICAL_W } from '../core/canvas';
-import { Rng } from '../core/rng';
-import type { Enemy, GameEvent } from './types';
+// All world drawing. Uses Hue's art (src/render/art), particles (src/fx) and FEEL constants. Cosmetic randomness only.
+import * as A from '../render/art';
+import { FEEL } from '../fx/feel';
+import { ParticleSystem } from '../fx/particles';
+import { ARENA_RADIUS, PHYSICS } from '../data';
 import type { World } from './sim';
+import type { Enemy, GameEvent } from './types';
 import { Rope } from './rope';
 
-interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; color: string; ring: boolean; alive: boolean }
+export interface Skins { ship: A.ShipSkin; orb: A.OrbSkin; trail: A.TrailId }
+export interface RenderOpts { shake: boolean; reducedFlashes: boolean; damageNumbers: boolean }
 
-const COL = { mite: '#ff4f7b', dart: '#ffd23f', brute: '#b86bff' } as const;
+interface Floater { x: number; y: number; text: string; kind: A.FloatKind; age: number; life: number; rise: number; alive: boolean }
+interface Ring { x: number; y: number; r: number; age: number; life: number; color: string; alive: boolean }
+interface Bolt { x1: number; y1: number; x2: number; y2: number; age: number; alive: boolean }
+
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+const TAU = Math.PI * 2;
+const STATE: A.EnemyState[] = ['idle', 'telegraph', 'attack'];
+const DANGER = '#ff4d5e';
 
-/** All world drawing lives here (circles + lines) so it can be swapped for real art later. */
+function colorOf(kind: string): string {
+  return (A.PALETTE.enemy as Record<string, string>)[kind] ?? (A.PALETTE.boss as Record<string, string>)[kind] ?? '#ffffff';
+}
+
 export class Renderer {
   camX = 0; camY = 0;
-  trauma = 0;
-  hurtFlash = 0;
-  private rng = new Rng(0xc0ffee); // cosmetic stream, never touches the sim RNG
-  private parts: Particle[] = [];
-  private rope = new Rope();
-  private trail: number[] = [];
-  private lastRun = -1;
-  private t = 0;
+  skins: Skins = { ship: 'default', orb: 'default', trail: 'none' };
+  opts: RenderOpts = { shake: true, reducedFlashes: false, damageNumbers: true };
   debug = false;
+  readonly ps = new ParticleSystem(2000);
+  private shakeAmp = 0; private shakeDecay = 10;
+  private hurtFlash = 0; private critFlash = 0; private levelFlash = 0;
+  private ropes = [new Rope(), new Rope(), new Rope()];
+  private ropePts = new Float32Array(16);
+  private trailPts = new Float32Array(2 * 20);
+  private trailN = 0; private trailAcc = 0;
+  private orbHist: number[][] = [[], [], []];
+  private floaters: Floater[] = [];
+  private rings: Ring[] = [];
+  private bolts: Bolt[] = [];
+  private t = 0;
+  private fresh = true;
+  intensity = 0;
 
   constructor() {
-    for (let i = 0; i < 600; i++) this.parts.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, size: 2, color: '#fff', ring: false, alive: false });
+    for (let i = 0; i < 80; i++) this.floaters.push({ x: 0, y: 0, text: '', kind: 'dmg', age: 0, life: 1, rise: 30, alive: false });
+    for (let i = 0; i < 24; i++) this.rings.push({ x: 0, y: 0, r: 100, age: 0, life: 0.3, color: '#fff', alive: false });
+    for (let i = 0; i < 24; i++) this.bolts.push({ x1: 0, y1: 0, x2: 0, y2: 0, age: 0, alive: false });
   }
 
-  private spawn(x: number, y: number, vx: number, vy: number, life: number, size: number, color: string, ring = false): void {
-    for (const p of this.parts) {
-      if (p.alive) continue;
-      p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.life = p.max = life; p.size = size; p.color = color; p.ring = ring; p.alive = true;
+  /** New run: snap camera, clear transient fx. */
+  reset(): void {
+    this.fresh = true; this.ps.clear(); this.trailN = 0;
+    for (const r of this.ropes) r.reset();
+    for (const h of this.orbHist) h.length = 0;
+    for (const f of this.floaters) f.alive = false;
+    for (const r of this.rings) r.alive = false;
+    for (const b of this.bolts) b.alive = false;
+    this.shakeAmp = 0; this.hurtFlash = this.critFlash = this.levelFlash = 0;
+  }
+
+  private shake(k: { amp: number; decay: number }): void {
+    if (!this.opts.shake) return;
+    if (k.amp > this.shakeAmp) { this.shakeAmp = k.amp; this.shakeDecay = k.decay; }
+  }
+  private float(x: number, y: number, text: string, kind: A.FloatKind): void {
+    for (const f of this.floaters) {
+      if (f.alive) continue;
+      const crit = kind === 'crit';
+      f.x = x + (Math.random() - 0.5) * FEEL.damageNumber.jitterPx * 2; f.y = y - 14; f.text = text; f.kind = kind; f.age = 0; f.alive = true;
+      f.life = (crit ? FEEL.damageNumber.critLifeMs : FEEL.damageNumber.lifeMs) / 1000;
+      f.rise = crit ? FEEL.damageNumber.critRisePx : FEEL.damageNumber.risePx;
       return;
     }
   }
+  private ring(x: number, y: number, r: number, life: number, color: string): void {
+    for (const q of this.rings) if (!q.alive) { q.x = x; q.y = y; q.r = r; q.age = 0; q.life = life; q.color = color; q.alive = true; return; }
+  }
 
   handleEvents(evs: GameEvent[], w: World): void {
-    const fx = w.T.fx, r = this.rng;
+    const ps = this.ps, R = Math.random;
     for (const e of evs) {
       switch (e.type) {
         case 'hit': {
-          this.trauma = Math.min(1, this.trauma + fx.shakeHit);
-          const n = e.crit ? 10 : 5;
-          for (let i = 0; i < n; i++) {
-            const a = Math.atan2(e.ny, e.nx) + r.range(-0.9, 0.9), s = r.range(150, 520);
-            this.spawn(e.x, e.y, Math.cos(a) * s, Math.sin(a) * s, r.range(0.15, 0.4), r.range(1.5, 3.2), e.crit ? '#ffd9a0' : '#ffffff');
+          const ang = Math.atan2(e.ny, e.nx);
+          if (e.bump) { ps.emit('spark', e.x, e.y, { angle: ang, color: '#9aa7c7', count: 3 }); break; }
+          if (e.crit) { ps.emit('crit', e.x, e.y, { angle: ang }); this.shake(FEEL.shake.crit); if (!this.opts.reducedFlashes) this.critFlash = FEEL.flashMs.screenCrit / 1000; }
+          else ps.emit('hit', e.x, e.y, { angle: ang, count: e.secondary ? 3 : 5 });
+          if (e.boss) this.shake(FEEL.shake.bossHit);
+          if (this.opts.damageNumbers && e.dmg > 0 && (e.crit || !e.secondary)) {
+            this.float(e.x, e.y - 6, String(e.dmg) + (e.crit ? '!' : ''), e.crit ? 'crit' : 'dmg');
           }
           break;
         }
-        case 'crit':
-          this.trauma = Math.min(1, this.trauma + fx.shakeCrit);
-          this.spawn(e.x, e.y, 0, 0, 0.3, 16, '#ffb347', true);
-          break;
         case 'kill': {
-          const col = COL[e.kind], n = e.kind === 'brute' ? 26 : 12;
-          for (let i = 0; i < n; i++) {
-            const a = r.range(0, Math.PI * 2), s = r.range(60, 380);
-            this.spawn(e.x, e.y, Math.cos(a) * s, Math.sin(a) * s, r.range(0.3, 0.7), r.range(2, 4.5), col);
-          }
-          this.spawn(e.x, e.y, 0, 0, 0.35, e.kind === 'brute' ? 30 : 14, col, true);
-          if (e.kind === 'brute') this.trauma = Math.min(1, this.trauma + 0.4);
+          const col = colorOf(e.kind);
+          if (!e.boss) { ps.emit('death', e.x, e.y, { color: col, count: e.kind === 'brute' ? 26 : 12 }); this.shake(FEEL.shake.kill); }
           break;
         }
-        case 'playerHurt':
-          this.trauma = Math.min(1, this.trauma + fx.shakeHurt);
-          this.hurtFlash = 1;
-          for (let i = 0; i < 16; i++) { const a = r.range(0, 6.283), s = r.range(100, 400); this.spawn(e.x, e.y, Math.cos(a) * s, Math.sin(a) * s, 0.5, 3, '#ff3d6e'); }
+        case 'bossDie':
+          ps.emit('bossDeath', e.x, e.y, { color: colorOf(e.boss) });
+          this.shake(FEEL.shake.bossDeath);
           break;
-        case 'pickup':
-          this.spawn(e.x, e.y, 0, 0, 0.18, 8, '#35f2c4', true);
+        case 'bossSpawn': this.ring(e.x, e.y, 220, 0.8, colorOf(e.boss)); this.shake(FEEL.shake.bossHit); break;
+        case 'bossPhase': this.shake(FEEL.shake.bossHit); break;
+        case 'bossStun': this.shake(FEEL.shake.crit); break;
+        case 'playerHurt':
+          ps.emit('playerHurt', e.x, e.y);
+          this.shake(FEEL.shake.playerHurt);
+          this.hurtFlash = FEEL.flashMs.playerHurt / 1000;
+          break;
+        case 'pickup': {
+          const col = (A.PALETTE.pickup as Record<string, string>)[e.kind];
+          if (e.kind === 'xpSmall') ps.emit('pickup', e.x, e.y, { color: col, count: 2 });
+          else ps.emit('pickup', e.x, e.y, { color: col, count: e.kind === 'xpBig' ? 5 : 10 });
+          break;
+        }
+        case 'heal':
+          if (this.opts.damageNumbers) this.float(e.x, e.y - 20, `+${e.amount}`, 'heal');
+          ps.emit('pickup', e.x, e.y, { color: '#ff7a9c', count: 8 });
           break;
         case 'levelUp':
-          this.spawn(w.ship.x, w.ship.y, 0, 0, 0.6, 70, '#35f2c4', true);
+          ps.emit('levelUp', w.ship.x, w.ship.y);
+          this.shake(FEEL.shake.levelUp);
+          if (!this.opts.reducedFlashes) this.levelFlash = FEEL.flashMs.levelUp / 1000;
           break;
-        case 'death':
-          this.trauma = 1;
-          for (let i = 0; i < 40; i++) { const a = r.range(0, 6.283), s = r.range(80, 600); this.spawn(e.x, e.y, Math.cos(a) * s, Math.sin(a) * s, 0.9, r.range(2, 5), '#ff3d6e'); }
+        case 'shockwave': this.ring(e.x, e.y, e.r, 0.25, '#b36bff'); break;
+        case 'explosion': this.ring(e.x, e.y, e.r, 0.3, '#ffb020'); this.shake(FEEL.shake.crit); break;
+        case 'chain':
+          for (const b of this.bolts) if (!b.alive) { b.x1 = e.x1; b.y1 = e.y1; b.x2 = e.x2; b.y2 = e.y2; b.age = 0; b.alive = true; break; }
           break;
+        case 'thorns': ps.emit('spark', e.x, e.y, { color: '#6aa8ff', count: 6 }); break;
+        case 'swat': ps.emit('spark', e.x, e.y, { color: '#ff3fa4', count: 4 }); break;
+        case 'orbWall': ps.emit('spark', e.x, e.y, { color: '#9fefff', count: 6, speed: 1.2 }); break;
+        case 'death': ps.emit('bossDeath', e.x, e.y, { color: A.PALETTE.player, count: 80 }); break;
+        default:
       }
+    }
+    void R;
+  }
+
+  private stateOf(e: Enemy): A.EnemyState {
+    if (e.def.ai === 'boss' && e.roar > 0) return 'telegraph';
+    return STATE[e.state] ?? 'idle';
+  }
+
+  /** Telegraph lanes / zones: same visual language for every enemy (flash + a line or area showing where it goes). */
+  private drawTelegraph(c: CanvasRenderingContext2D, e: Enemy, x: number, y: number): void {
+    if (e.state === 0) return;
+    const P = e.def.params;
+    const prog = e.state === 1 ? 1 - e.timer / e.telTotal : 1;
+    const flash = Math.floor(this.t * 8) % 2 === 0; // 4 Hz
+    c.save();
+    c.lineCap = 'round';
+    const col = flash && e.state === 1 ? '#ffffff' : DANGER;
+    const lane = (len: number, width: number): void => {
+      c.globalAlpha = 0.12 + prog * 0.35; c.strokeStyle = col; c.lineWidth = width;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + e.dirX * len, y + e.dirY * len); c.stroke();
+      c.globalAlpha = 0.5 + prog * 0.4; c.lineWidth = 2; c.beginPath(); c.moveTo(x, y); c.lineTo(x + e.dirX * len, y + e.dirY * len); c.stroke();
+    };
+    switch (e.kind) {
+      case 'dart': if (e.state === 1) lane(P.dashSpeed * P.dashSec, 4 + prog * 8); break;
+      case 'wisp': if (e.state === 1) lane(P.lungeSpeed * P.lungeSec, 3 + prog * 6); break;
+      case 'brute': if (e.state === 1) lane(P.chargeSpeed * P.chargeSec, e.radius * 2 * (0.4 + prog * 0.6)); break;
+      case 'spitter': if (e.state === 1) { c.globalAlpha = 0.4 + prog * 0.5; c.strokeStyle = '#ff3fa4'; c.lineWidth = 2; c.beginPath(); c.moveTo(x + e.dirX * 20, y + e.dirY * 20); c.lineTo(x + e.dirX * (50 + prog * 40), y + e.dirY * (50 + prog * 40)); c.stroke(); } break;
+      case 'warden':
+        if (e.pat === 1 && e.state === 1) lane(P.chargeSpeed * P.chargeSec, 56);
+        else if (e.pat === 0 && e.state === 1) {
+          const n = e.phase2 ? P.phase2RingCount : P.ringCount;
+          c.globalAlpha = 0.3 + prog * 0.6; c.strokeStyle = col; c.lineWidth = 3; c.beginPath();
+          for (let i = 0; i < n; i++) { const a = (i / n) * TAU, r0 = e.radius + 8, r1 = e.radius + 30 + prog * 30; c.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); c.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); }
+          c.stroke();
+        }
+        break;
+      case 'hive':
+        if (e.pat === 1 && e.state === 1) {
+          const half = (P.volleySpreadDeg * Math.PI) / 360, a0 = Math.atan2(e.dirY, e.dirX);
+          c.globalAlpha = 0.1 + prog * 0.3; c.fillStyle = col; c.beginPath(); c.moveTo(x, y); c.arc(x, y, 420, a0 - half, a0 + half); c.closePath(); c.fill();
+        }
+        break;
+      case 'eclipse':
+        if (e.pat === 0 && e.state === 1) {
+          c.globalAlpha = 0.1 + prog * 0.35; c.strokeStyle = '#c07bff'; c.lineWidth = 3; c.beginPath();
+          for (let i = 0; i < P.spiralArms; i++) { const a = Math.atan2(e.dirY, e.dirX) + (i / P.spiralArms) * TAU; c.moveTo(x, y); c.lineTo(x + Math.cos(a) * 520, y + Math.sin(a) * 520); }
+          c.stroke();
+        } else if (e.pat === 1 && e.state === 1) {
+          c.globalAlpha = 0.18 + prog * 0.3; c.fillStyle = '#1a0630'; c.beginPath(); c.arc(e.tx, e.ty, P.blinkRadius, 0, TAU); c.fill();
+          c.globalAlpha = 0.9; c.strokeStyle = flash ? '#ffffff' : '#c07bff'; c.lineWidth = 3; c.beginPath(); c.arc(e.tx, e.ty, P.blinkRadius, 0, TAU); c.stroke();
+          c.globalAlpha = 0.9; c.beginPath(); c.arc(e.tx, e.ty, P.blinkRadius * (1 - prog), 0, TAU); c.stroke();
+        } else if (e.pat === 2) {
+          c.globalAlpha = 0.08 + 0.12 * Math.sin(this.t * 10) ** 2; c.strokeStyle = '#c07bff'; c.lineWidth = 6; c.beginPath(); c.arc(x, y, P.wellRadius * (e.state === 1 ? 0.5 + 0.5 * prog : 1), 0, TAU); c.stroke();
+        }
+        break;
+      default:
+    }
+    c.restore();
+  }
+
+  /** Title / hangar backdrop. */
+  drawMenu(c: CanvasRenderingContext2D, w: number, h: number, dt: number, mode: 'title' | 'hangar' | 'results', loadout?: { ship: string; orb: string; shipSkin: A.ShipSkin; orbSkin: A.OrbSkin }): void {
+    this.t += dt;
+    const t = this.t;
+    A.drawBackground(c, w, h, t * 30, t * 12, t, 0.35);
+    if (mode === 'title') {
+      A.drawLogo(c, w / 2, Math.min(h * 0.3, 260), Math.min(1.5, w / 700), t);
+    } else if (mode === 'hangar' && loadout) {
+      const wide = w >= 900;
+      const cx = wide ? w * 0.74 : w * 0.5, cy = wide ? h * 0.5 : h * 0.15;
+      const a = t * 1.6, L = 110;
+      const ox = cx + Math.cos(a) * L, oy = cy + Math.sin(a) * L;
+      const n = 8, pts = this.ropePts;
+      for (let i = 0; i < n; i++) { const f = i / (n - 1); pts[i * 2] = lerp(cx, ox, f); pts[i * 2 + 1] = lerp(cy, oy, f); }
+      A.drawTether(c, pts.subarray(0, n * 2), 0.5, false, loadout.orbSkin, t);
+      A.drawOrb(c, ox, oy, 18, 0.6 + 0.3 * Math.sin(t), loadout.orbSkin, t);
+      A.drawShip(c, cx, cy, a + Math.PI / 2, 22, loadout.shipSkin, t, 0);
     }
   }
 
-  draw(c: CanvasRenderingContext2D, w: World, alpha: number, dt: number): void {
+  draw(c: CanvasRenderingContext2D, w: World, alpha: number, dt: number, sw: number, sh: number): void {
     this.t += dt;
-    const T = w.T, s = w.ship, o = w.orb;
+    const t = this.t, st = w.stats, s = w.ship;
     const sx = lerp(s.px, s.x, alpha), sy = lerp(s.py, s.y, alpha);
-    const ox = lerp(o.px, o.x, alpha), oy = lerp(o.py, o.y, alpha);
-
-    // camera with lookahead
-    const tx = sx + s.vx * 0.25, ty = sy + s.vy * 0.25;
-    if (this.lastRun !== w.runIndex) { this.camX = tx; this.camY = ty; this.lastRun = w.runIndex; this.rope.reset(); this.trail.length = 0; }
+    const tx = sx + s.vx * 0.2, ty = sy + s.vy * 0.2;
+    if (this.fresh) { this.camX = tx; this.camY = ty; this.fresh = false; }
     const k = 1 - Math.exp(-6 * dt);
     this.camX += (tx - this.camX) * k; this.camY += (ty - this.camY) * k;
-    this.trauma = Math.max(0, this.trauma - dt * 1.8);
-    this.hurtFlash = Math.max(0, this.hurtFlash - dt * 2.5);
-    const sh = this.trauma * this.trauma * 16;
-    const camX = this.camX + (this.rng.next() - 0.5) * 2 * sh;
-    const camY = this.camY + (this.rng.next() - 0.5) * 2 * sh;
+    this.shakeAmp *= Math.exp(-this.shakeDecay * dt);
+    if (this.shakeAmp < 0.05) this.shakeAmp = 0;
+    this.hurtFlash = Math.max(0, this.hurtFlash - dt);
+    this.critFlash = Math.max(0, this.critFlash - dt);
+    this.levelFlash = Math.max(0, this.levelFlash - dt);
+    const camX = this.camX + (Math.random() - 0.5) * 2 * this.shakeAmp;
+    const camY = this.camY + (Math.random() - 0.5) * 2 * this.shakeAmp;
 
-    c.fillStyle = '#05060f';
-    c.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+    A.drawBackground(c, sw, sh, camX, camY, t, this.intensity);
     c.save();
-    c.translate(LOGICAL_W / 2 - camX, LOGICAL_H / 2 - camY);
-    const vx0 = camX - LOGICAL_W / 2 - 40, vx1 = camX + LOGICAL_W / 2 + 40;
-    const vy0 = camY - LOGICAL_H / 2 - 40, vy1 = camY + LOGICAL_H / 2 + 40;
+    c.translate(sw / 2 - camX, sh / 2 - camY);
+    const vx0 = camX - sw / 2 - 40, vx1 = camX + sw / 2 + 40, vy0 = camY - sh / 2 - 40, vy1 = camY + sh / 2 + 40;
+    if (Math.hypot(camX, camY) + Math.hypot(sw, sh) / 2 > ARENA_RADIUS - 30) A.drawArenaBounds(c, 0, 0, ARENA_RADIUS, t);
 
-    // grid
-    c.lineWidth = 1; c.strokeStyle = 'rgba(70,90,180,0.16)'; c.beginPath();
-    for (let gx = Math.floor(vx0 / 100) * 100; gx <= vx1; gx += 100) { c.moveTo(gx, vy0); c.lineTo(gx, vy1); }
-    for (let gy = Math.floor(vy0 / 100) * 100; gy <= vy1; gy += 100) { c.moveTo(vx0, gy); c.lineTo(vx1, gy); }
-    c.stroke();
-
-    // out-of-arena dim + boundary
-    c.beginPath(); c.rect(vx0 - 10, vy0 - 10, vx1 - vx0 + 20, vy1 - vy0 + 20); c.arc(0, 0, T.arenaRadius, 0, Math.PI * 2, true);
-    c.fillStyle = 'rgba(2,2,8,0.85)'; c.fill('evenodd');
-    c.beginPath(); c.arc(0, 0, T.arenaRadius, 0, Math.PI * 2);
-    c.lineWidth = 10; c.strokeStyle = 'rgba(40,140,255,0.18)'; c.stroke();
-    c.lineWidth = 3; c.strokeStyle = '#3aa0ff'; c.stroke();
-
-    c.globalCompositeOperation = 'lighter';
-
-    // motes
-    c.fillStyle = '#35f2c4';
-    for (let i = 0; i < w.motes.count; i++) {
-      const m = w.motes.items[i];
-      const x = lerp(m.px, m.x, alpha), y = lerp(m.py, m.y, alpha);
+    // pickups
+    const pk = w.pickups;
+    for (let i = 0; i < pk.count; i++) {
+      const p = pk.items[i];
+      const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha);
       if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
-      const r = 3 + m.value * 0.6;
-      c.fillRect(x - r, y - r, r * 2, r * 2);
+      A.drawPickup(c, p.kind, x, y, t);
     }
 
-    // enemies
-    for (let i = 0; i < w.enemies.count; i++) {
-      const e = w.enemies.items[i];
-      const x = lerp(e.px, e.x, alpha), y = lerp(e.py, e.y, alpha);
-      if (x < vx0 - 30 || x > vx1 + 30 || y < vy0 - 30 || y > vy1 + 30) continue;
-      this.drawEnemy(c, e, x, y);
-    }
-
-    // rope (visual verlet)
-    const dist = Math.hypot(ox - sx, oy - sy);
-    this.rope.update(sx, sy, ox, oy, Math.min(T.tetherLength * 1.05, Math.max(dist, 10) * 1.02 + 6), Math.min(dt, 0.05));
-    const speed = w.orbSpeed();
-    const heat = Math.min(1, Math.max(0, (speed - T.minDamageSpeed * 0.6) / (T.critSpeed - T.minDamageSpeed * 0.6)));
-    const dangerous = speed >= T.minDamageSpeed, crit = speed >= T.critSpeed;
-    const tension = Math.min(1, Math.max(0, (dist - T.tetherLength) / (T.tetherLength * (T.maxStretch - 1))));
-    c.lineCap = 'round'; c.lineJoin = 'round';
-    c.beginPath(); c.moveTo(this.rope.x[0], this.rope.y[0]);
-    for (let i = 1; i < this.rope.n; i++) c.lineTo(this.rope.x[i], this.rope.y[i]);
-    c.lineWidth = 6 + tension * 3; c.strokeStyle = `rgba(80,200,255,${0.15 + tension * 0.2})`; c.stroke();
-    c.lineWidth = 2.5; c.strokeStyle = `rgba(${150 + tension * 105},${230 - tension * 40},255,0.95)`; c.stroke();
-
-    // orb trail
-    const tr = this.trail;
-    tr.push(ox, oy);
-    if (tr.length > 20) tr.splice(0, 2);
-    for (let i = 2; i < tr.length; i += 2) {
-      const f = i / tr.length;
-      c.beginPath(); c.moveTo(tr[i - 2], tr[i - 1]); c.lineTo(tr[i], tr[i + 1]);
-      c.lineWidth = o.radius * 1.6 * f; c.strokeStyle = crit ? `rgba(255,170,70,${f * 0.6})` : dangerous ? `rgba(120,230,255,${f * 0.5})` : `rgba(80,100,200,${f * 0.35})`;
-      c.stroke();
-    }
-
-    // orb
-    c.shadowBlur = 8 + heat * 30; c.shadowColor = crit ? '#ffb347' : dangerous ? '#7ee8ff' : '#4a5acd';
-    c.beginPath(); c.arc(ox, oy, o.radius * (1 + heat * 0.25), 0, Math.PI * 2);
-    c.fillStyle = crit ? '#ffd9a0' : dangerous ? '#c8f6ff' : '#6677dd'; c.fill();
-    c.lineWidth = 3; c.strokeStyle = crit ? '#ff8a2a' : dangerous ? '#3fd0ff' : '#33408a'; c.stroke();
-    c.shadowBlur = 0;
-
-    // ship
-    const blink = s.iframes > 0 && Math.floor(this.t * 20) % 2 === 0;
-    if (!w.dead && !blink) {
-      c.save(); c.translate(sx, sy); c.rotate(s.aim);
-      c.shadowBlur = 14; c.shadowColor = '#35f2c4';
-      c.beginPath(); c.moveTo(s.radius * 1.3, 0); c.lineTo(-s.radius, s.radius * 0.9); c.lineTo(-s.radius * 0.5, 0); c.lineTo(-s.radius, -s.radius * 0.9); c.closePath();
-      c.fillStyle = 'rgba(53,242,196,0.35)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = '#7dffe0'; c.stroke();
-      c.restore(); c.shadowBlur = 0;
-    }
-
-    // particles
-    for (const p of this.parts) {
-      if (!p.alive) continue;
-      p.life -= dt;
-      if (p.life <= 0) { p.alive = false; continue; }
-      const f = p.life / p.max;
-      if (p.ring) {
-        c.beginPath(); c.arc(p.x, p.y, p.size * (2 - f), 0, Math.PI * 2);
-        c.lineWidth = 3 * f + 0.5; c.strokeStyle = p.color; c.globalAlpha = f; c.stroke();
-      } else {
-        p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.93; p.vy *= 0.93;
-        c.globalAlpha = f; c.fillStyle = p.color; c.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    // enemies (bosses last so they sit on top)
+    const en = w.enemies;
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < en.count; i++) {
+        const e = en.items[i];
+        if (!e.alive || (e.def.ai === 'boss') !== (pass === 1)) continue;
+        const x = lerp(e.px, e.x, alpha), y = lerp(e.py, e.y, alpha);
+        const m = e.radius + (e.def.ai === 'boss' ? 760 : 60);
+        if (x < vx0 - m || x > vx1 + m || y < vy0 - m || y > vy1 + m) continue;
+        this.drawTelegraph(c, e, x, y);
+        const hit = e.flash > 0 ? Math.min(1, e.flash / (FEEL.flashMs.enemyHit / 1000)) : 0;
+        const inv = e.invuln > 0 ? 0.6 : 0;
+        A.drawEnemy(c, e.kind, x, y, e.radius, e.ang, t, Math.max(hit, inv), this.stateOf(e));
+        if (e.stun > 0) A.drawFloatingText(c, 'STUNNED', x, y - e.radius - 24, 1, 'info');
       }
     }
-    c.globalAlpha = 1;
 
-    if (this.debug) this.drawHitboxes(c, w);
-    c.globalCompositeOperation = 'source-over';
+    // projectiles
+    const pr = w.projectiles;
+    for (let i = 0; i < pr.count; i++) {
+      const p = pr.items[i];
+      const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha);
+      if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
+      A.drawProjectile(c, p.kind, x, y, p.r, t);
+    }
+
+    // slow field disc (Gravity Reel)
+    const sf = w.behaviors.get('slowField');
+    if (sf && (!sf.onlyWhileReeling || w.tether.phase === 'reeling' || w.tether.phase === 'held')) {
+      for (const o of w.orbs) { c.save(); c.globalAlpha = 0.18 + 0.06 * Math.sin(t * 12); A.drawGlow(c, o.x, o.y, sf.radius, '#b36bff', 0.9); c.restore(); }
+    }
+
+    // tether(s), ship trail, orbs, ship
+    const dtc = Math.min(dt, 0.05);
+    const reeling = w.tether.phase === 'reeling' || w.tether.phase === 'held';
+    const speed = w.orbSpeed();
+    const speed01 = Math.min(1, speed / st.critSpeed);
+    for (let oi = 0; oi < w.orbs.length; oi++) {
+      const o = w.orbs[oi];
+      const ox = lerp(o.px, o.x, alpha), oy = lerp(o.py, o.y, alpha);
+      const Li = st.tetherLength * (1 - 0.2 * oi);
+      const dist = Math.hypot(ox - sx, oy - sy);
+      const rope = this.ropes[oi];
+      rope.update(sx, sy, ox, oy, Math.min(Li * 1.05, Math.max(dist, 10) * 1.02 + 6), dtc);
+      const pts = this.ropePts;
+      for (let i = 0; i < rope.n; i++) { pts[i * 2] = rope.x[i]; pts[i * 2 + 1] = rope.y[i]; }
+      const tension = Math.min(1, Math.max(0, (dist - Li) / (Li * (PHYSICS.maxStretchRatio - 1))));
+      A.drawTether(c, pts.subarray(0, rope.n * 2), Math.max(tension, reeling ? 0.6 : 0), reeling, this.skins.orb, t);
+      // short motion streak so a fast orb reads as fast
+      const hist = this.orbHist[oi];
+      hist.push(ox, oy); if (hist.length > 14) hist.splice(0, 2);
+      if (speed >= st.minDamageSpeed * 0.8 && hist.length >= 4) {
+        c.save(); c.globalCompositeOperation = 'lighter'; c.lineCap = 'round';
+        for (let i = 2; i < hist.length; i += 2) {
+          const f = i / hist.length;
+          c.globalAlpha = f * (speed01 >= 1 ? 0.6 : 0.35); c.strokeStyle = speed01 >= 1 ? '#ffd166' : A.PALETTE.player; c.lineWidth = o.radius * 1.5 * f;
+          c.beginPath(); c.moveTo(hist[i - 2], hist[i - 1]); c.lineTo(hist[i], hist[i + 1]); c.stroke();
+        }
+        c.restore();
+      }
+    }
+    // ship trail (cosmetic)
+    if (this.skins.trail !== 'none') {
+      this.trailAcc += dt;
+      if (this.trailAcc > 0.016) {
+        this.trailAcc = 0;
+        const n = 20, tp = this.trailPts;
+        if (this.trailN < n) this.trailN++;
+        for (let i = 0; i < (this.trailN - 1) * 2; i++) tp[i] = tp[i + 2];
+        tp[(this.trailN - 1) * 2] = sx; tp[(this.trailN - 1) * 2 + 1] = sy;
+      }
+      if (this.trailN > 2) A.drawTrail(c, this.trailPts.subarray(0, this.trailN * 2), this.skins.trail, t);
+    }
+    for (let oi = 0; oi < w.orbs.length; oi++) {
+      const o = w.orbs[oi];
+      A.drawOrb(c, lerp(o.px, o.x, alpha), lerp(o.py, o.y, alpha), o.radius, Math.min(1, Math.hypot(o.vx, o.vy) / st.critSpeed), this.skins.orb, t);
+    }
+    if (w.outcome !== 'dead') {
+      const hurt = s.iframes > 0 ? (Math.floor(t * 10) % 2 === 0 ? 1 : 0.2) : 0;
+      A.drawShip(c, sx, sy, s.aim, s.radius + 3, this.skins.ship, t, hurt);
+    }
+
+    // behavior fx
+    this.ps.update(dt);
+    this.ps.draw(c);
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    for (const r of this.rings) {
+      if (!r.alive) continue;
+      r.age += dt; if (r.age >= r.life) { r.alive = false; continue; }
+      const f = r.age / r.life;
+      c.globalAlpha = 1 - f; c.strokeStyle = r.color; c.lineWidth = 6 * (1 - f) + 1;
+      c.beginPath(); c.arc(r.x, r.y, r.r * (0.3 + 0.7 * f), 0, TAU); c.stroke();
+    }
+    for (const b of this.bolts) {
+      if (!b.alive) continue;
+      b.age += dt; if (b.age > 0.08) { b.alive = false; continue; }
+      c.globalAlpha = 1 - b.age / 0.08; c.strokeStyle = A.PALETTE.player; c.lineWidth = 3; c.beginPath(); c.moveTo(b.x1, b.y1);
+      const mx = (b.x1 + b.x2) / 2 + (Math.random() - 0.5) * 24, my = (b.y1 + b.y2) / 2 + (Math.random() - 0.5) * 24;
+      c.lineTo(mx, my); c.lineTo(b.x2, b.y2); c.stroke();
+    }
     c.restore();
 
-    if (this.hurtFlash > 0) {
-      const g = c.createRadialGradient(LOGICAL_W / 2, LOGICAL_H / 2, 200, LOGICAL_W / 2, LOGICAL_H / 2, 760);
-      g.addColorStop(0, 'rgba(255,40,80,0)'); g.addColorStop(1, `rgba(255,40,80,${this.hurtFlash * 0.5})`);
-      c.fillStyle = g; c.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+    // floating text
+    for (const f of this.floaters) {
+      if (!f.alive) continue;
+      f.age += dt;
+      if (f.age >= f.life) { f.alive = false; continue; }
+      if (!f.text) continue;
+      const p = f.age / f.life;
+      A.drawFloatingText(c, f.text, f.x, f.y - f.rise * (1 - (1 - p) * (1 - p)), 1 - p * p, f.kind);
     }
-  }
+    if (this.debug) this.drawHitboxes(c, w);
+    c.restore();
 
-  private drawEnemy(c: CanvasRenderingContext2D, e: Enemy, x: number, y: number): void {
-    const flash = e.flash > 0;
-    const col = flash ? '#ffffff' : COL[e.kind];
-    c.lineWidth = 2.5; c.strokeStyle = col;
-    c.fillStyle = flash ? 'rgba(255,255,255,0.85)' : e.kind === 'brute' ? 'rgba(184,107,255,0.3)' : e.kind === 'dart' ? 'rgba(255,210,63,0.25)' : 'rgba(255,79,123,0.3)';
-    if (e.kind === 'dart') {
-      const a = Math.atan2(e.dirY, e.dirX);
-      const tel = e.state === 1;
-      if (tel) {
-        const f = 1 - e.timer / 0.7;
-        c.beginPath(); c.moveTo(x, y); c.lineTo(x + e.dirX * 380, y + e.dirY * 380);
-        c.lineWidth = 2 + f * 6; c.strokeStyle = `rgba(255,${Math.floor(210 - f * 120)},60,${0.15 + f * 0.6})`; c.stroke();
-        c.lineWidth = 2.5; c.strokeStyle = col;
-      }
-      c.save(); c.translate(x, y); c.rotate(a);
-      const r = e.radius * (tel ? 1.15 : 1);
-      c.beginPath(); c.moveTo(r * 1.5, 0); c.lineTo(-r, r * 0.9); c.lineTo(-r, -r * 0.9); c.closePath();
-      c.fill(); c.stroke(); c.restore();
-    } else {
-      c.beginPath(); c.arc(x, y, e.radius, 0, Math.PI * 2); c.fill(); c.stroke();
-      if (e.kind === 'brute') { c.beginPath(); c.arc(x, y, e.radius * 0.55, 0, Math.PI * 2); c.stroke(); }
+    // screen flashes (skipped when "reduced flashes" is on, except a gentle hurt vignette)
+    if (this.hurtFlash > 0) {
+      const f = this.hurtFlash / (FEEL.flashMs.playerHurt / 1000) * (this.opts.reducedFlashes ? 0.25 : 0.55);
+      const g = c.createRadialGradient(sw / 2, sh / 2, Math.min(sw, sh) * 0.3, sw / 2, sh / 2, Math.hypot(sw, sh) * 0.55);
+      g.addColorStop(0, 'rgba(255,40,80,0)'); g.addColorStop(1, `rgba(255,40,80,${f})`);
+      c.fillStyle = g; c.fillRect(0, 0, sw, sh);
     }
+    if (this.critFlash > 0) { c.fillStyle = `rgba(255,240,200,${0.07 * this.critFlash / (FEEL.flashMs.screenCrit / 1000)})`; c.fillRect(0, 0, sw, sh); }
+    if (this.levelFlash > 0) { c.fillStyle = `rgba(53,230,255,${0.12 * this.levelFlash / (FEEL.flashMs.levelUp / 1000)})`; c.fillRect(0, 0, sw, sh); }
   }
 
   private drawHitboxes(c: CanvasRenderingContext2D, w: World): void {
     c.lineWidth = 1; c.strokeStyle = '#00ff66';
     c.beginPath();
-    for (let i = 0; i < w.enemies.count; i++) { const e = w.enemies.items[i]; c.moveTo(e.x + e.radius, e.y); c.arc(e.x, e.y, e.radius, 0, Math.PI * 2); }
-    c.moveTo(w.orb.x + w.orb.radius, w.orb.y); c.arc(w.orb.x, w.orb.y, w.orb.radius, 0, Math.PI * 2);
-    c.moveTo(w.ship.x + w.ship.radius, w.ship.y); c.arc(w.ship.x, w.ship.y, w.ship.radius, 0, Math.PI * 2);
+    for (let i = 0; i < w.enemies.count; i++) { const e = w.enemies.items[i]; c.moveTo(e.x + e.radius, e.y); c.arc(e.x, e.y, e.radius, 0, TAU); }
+    for (const o of w.orbs) { c.moveTo(o.x + o.radius, o.y); c.arc(o.x, o.y, o.radius, 0, TAU); }
+    c.moveTo(w.ship.x + w.ship.radius, w.ship.y); c.arc(w.ship.x, w.ship.y, w.ship.radius, 0, TAU);
     c.stroke();
   }
 }
