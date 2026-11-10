@@ -61,4 +61,4 @@ cycle every 180 s (Warden, Hive, Eclipse at +50% HP per cycle).
 
 - **Edge-circling**: covered (spawns arc inward, wall eats orb speed).
 - **Killing slowly to keep the screen empty** (a low alive count): spawns are time-driven, so going slow only lets enemies pile up to maxAlive. No benefit.
-- **Skipping bosses**: Warden/Hive leave after 120 s, so you can survive them without killing them, but you lose 50 stardust and 80/150 XP each. A valid choice for weak runs, never optimal.
+- **Skipping bosses**: Warden/Hive leave after 120 s, so you can survive them without killing them, but you lose 50 stardust and 45/90 XP (2-3 drafts) each. A valid choice for weak runs, never optimal.
