@@ -23,7 +23,7 @@ export const TUNING = {
   releaseTime: 0.35,
   orbRadius: 16,
   orbMass: 1,
-  orbDrag: 0.25,
+  orbDrag: 0.6,
   maxOrbSpeed: 1600,
   // damage
   minDamageSpeed: 250,
