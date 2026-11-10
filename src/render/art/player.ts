@@ -115,7 +115,7 @@ export function drawOrb(ctx: CanvasRenderingContext2D, x: number, y: number, r: 
 
 const DASH_A = [10, 6];
 const NO_DASH: number[] = [];
-export function drawTether(ctx: CanvasRenderingContext2D, pts: Float32Array, tension01: number, reeling: boolean, skin: OrbSkin): void {
+export function drawTether(ctx: CanvasRenderingContext2D, pts: Float32Array, tension01: number, reeling: boolean, skin: OrbSkin, t?: number): void {
   const n = pts.length >> 1;
   if (n < 2) return;
   const s = ORB[skin];
@@ -131,7 +131,7 @@ export function drawTether(ctx: CanvasRenderingContext2D, pts: Float32Array, ten
   path();
   ctx.strokeStyle = k > 0.8 ? '#ffffff' : s.mid; ctx.lineWidth = 2.5 - 1 * k; ctx.stroke();
   if (reeling) {
-    ctx.setLineDash(DASH_A); ctx.lineDashOffset = -(performance.now() * 0.06) % 16;
+    ctx.setLineDash(DASH_A); ctx.lineDashOffset = -((t !== undefined ? t * 1000 : performance.now()) * 0.06) % 16;
     path(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.setLineDash(NO_DASH); ctx.lineDashOffset = 0;
   }
