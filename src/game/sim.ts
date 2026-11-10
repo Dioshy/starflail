@@ -1156,6 +1156,9 @@ export class World {
     this.recomputeStats();
   }
 
+  /** Add XP directly (dev params, tests). */
+  grantXp(v: number): void { this.addXp(v); }
+
   /** Apply an upgrade directly (tests, debug cheats). Ignores locks; respects maxStacks. */
   grantUpgrade(id: string): boolean {
     const def = UPGRADES.find((u) => u.id === id);

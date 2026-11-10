@@ -189,6 +189,7 @@ export class Game {
     this.input.resetReel(); this.input.clearLatches(); this.input.moved = false; this.input.reeled = false;
     this.stepper.acc = 0; this.hitstop = 0; this.slowT = 0; this.draftDelay = 0; this.hintT = 0;
     if (this.params.skipTo > 0 && this.runIndex === 1) this.skipTo(this.params.skipTo);
+    if (import.meta.env.DEV && this.params.draft && this.runIndex === 1) this.world.grantXp(10);
     this.hud.show(true);
     this.hud.setHint(null);
     audio.music.start();
@@ -343,6 +344,7 @@ export class Game {
       this.renderer.intensity = this.intens;
       if (w.outcome && !this.resultsShown && w.deadTime >= (w.outcome === 'won' ? WIN_DELAY : DEATH_DELAY)) this.showResults();
     }
+    if (!live) this.hud.setHint(null);
     this.renderer.draw(c, w, alpha, live ? real : 0, s.w, s.h);
     drawJoystick(c, this.input.touch);
     this.hud.el.classList.toggle('touch', this.input.touch.seen);

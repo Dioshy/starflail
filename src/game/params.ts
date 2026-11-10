@@ -11,6 +11,8 @@ export interface Params {
   screen: '' | 'title' | 'hangar' | 'results';
   /** dev only: add stardust to the save */
   give: number;
+  /** dev only: open a level-up draft immediately */
+  draft: boolean;
   /** any of seed/skipTo/stress/auto/debug/god given: skip the title and start a run immediately */
   direct: boolean;
 }
@@ -35,8 +37,9 @@ export function parseParams(search: string): Params {
     auto: flag('auto'),
     screen: screen === 'title' || screen === 'hangar' || screen === 'results' ? screen : '',
     give: Math.max(0, Math.floor(num('give', 0))),
+    draft: flag('draft'),
     direct: false,
   };
-  p.direct = p.seedGiven || p.debug || p.god || p.skipTo > 0 || p.stress > 0 || p.auto;
+  p.direct = p.draft || p.seedGiven || p.debug || p.god || p.skipTo > 0 || p.stress > 0 || p.auto;
   return p;
 }

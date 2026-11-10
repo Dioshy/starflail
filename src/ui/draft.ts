@@ -10,7 +10,7 @@ const LABEL: Record<StatKey, string> = {
   critMultiplier: 'Crit x', knockback: 'Knockback', pickupRadius: 'Pickup radius', xpGain: 'XP gain', iframesSec: 'I-frames', regenPerMin: 'Regen/min',
   orbCount: 'Orbs', stardustGain: 'Stardust', 
 };
-const fmt = (v: number): string => (Math.abs(v) >= 100 ? String(Math.round(v)) : String(Math.round(v * 100) / 100));
+const fmt = (v: number): string => (Math.abs(v) >= 100 ? String(Math.round(v)) : Math.abs(v) < 1 ? String(Math.round(v * 1000) / 1000) : String(Math.round(v * 100) / 100));
 
 /** "Tether 140 -> 160" style previews for stat upgrades (up to two lines). */
 export function previewDelta(w: World, id: string): string[] {
