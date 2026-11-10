@@ -11,7 +11,7 @@ export const BASE_STATS: Stats = {
   tetherStiffness: 40, // spring k: orb accel = k * stretch / orbMass (px/s^2 per px)
   reelRatio: 0.5, // reeled length = reelRatio * tetherLength (lower = stronger reel)
   damagePerSpeed: 0.08, // damage per px/s of orb speed
-  minDamageSpeed: 250, // px/s; below this a hit only bumps
+  minDamageSpeed: 150, // px/s (was 250; balance.md s8 passive floor); below this a hit only bumps
   critSpeed: 900, // px/s; at or above this a hit crits
   critMultiplier: 2,
   knockback: 1,
@@ -34,7 +34,7 @@ export const STAT_LIMITS: Record<StatKey, { min: number; max: number }> = {
   tetherStiffness: { min: 20, max: 80 },
   reelRatio: { min: 0.3, max: 0.8 },
   damagePerSpeed: { min: 0.04, max: 0.2 },
-  minDamageSpeed: { min: 120, max: 400 },
+  minDamageSpeed: { min: 60, max: 400 },
   critSpeed: { min: 550, max: 1300 },
   critMultiplier: { min: 1.5, max: 4 },
   knockback: { min: 0.5, max: 3 },
@@ -53,7 +53,7 @@ export const PHYSICS: PhysicsDef = {
   heldReelExtraDamping: 1.5, // 1/s, applied after the reel completes while still held
   wallSpeedLoss: 0.5, // fraction of orb speed lost on arena-wall contact
   reelReleaseSec: 0.35, // rest length lerps back to L
-  orbDrag: 1.25, // 1/s: v_rel = orb.vel - ship.vel; v_rel *= exp(-orbDrag * dt). Tuned in Gear's greybox (t11)
+  orbDrag: 0.75, // (was 1.25; balance.md s8 passive floor) 1/s: v_rel = orb.vel - ship.vel; v_rel *= exp(-orbDrag * dt). Tuned in Gear's greybox (t11)
   tetherDamping: 4, // 1/s, damps radial (stretch) velocity only
   maxStretchRatio: 1.6, // tether behaves as a hard rope beyond 1.6 * rest length
   massDamageExponent: 0.5, // damage scales with orbMass^0.5

@@ -40,7 +40,8 @@ describe('tether', () => {
 
   it('a carried orb is not slowed by drag (relative drag)', () => {
     const w = new World({ seed: 1, noSpawn: true });
-    for (let i = 0; i < 270; i++) w.step({ ...idle(), moveX: 1 });
+    w.ship.x = w.ship.px = -1400; w.orb.x = w.orb.px = -1260; // start far from the wall so it never clips
+    for (let i = 0; i < 330; i++) w.step({ ...idle(), moveX: 1 });
     const rel = Math.hypot(w.orb.vx - w.ship.vx, w.orb.vy - w.ship.vy);
     expect(rel).toBeLessThan(5);
   });
