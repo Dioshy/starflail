@@ -138,6 +138,10 @@ export class StoreScreen {
       row.append(chip);
     }
     this.body.append(row);
+    const legal = h('p', 'sec-note');
+    for (const [t, href] of [['Privacy', 'privacy.html'], ['Terms', 'terms.html']]) { const a = h('a', '', t, { href, target: '_blank', rel: 'noopener' }); legal.append(a, document.createTextNode('  ·  ')); }
+    legal.lastChild?.remove();
+    this.body.append(legal);
     this.body.scrollTop = scroll;
   }
 }

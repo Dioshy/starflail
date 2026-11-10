@@ -9,8 +9,9 @@ export { AdService } from './ads';
 export { SaveEntitlements, hasNoAds, isSupporter, ownsSku, grantSku, equipSkuCosmetics } from './entitlements';
 export { fmtEur } from './util';
 
-export function platformFromEnv(raw: unknown): Platform {
-  return raw === 'web' || raw === 'crazygames' || raw === 'poki' || raw === 'itch' || raw === 'mock' ? raw : 'mock';
+/** Unset/unknown: 'mock' in dev, 'web' in production builds. A production build can never ship fake checkout by accident. */
+export function platformFromEnv(raw: unknown, dev: boolean = import.meta.env.DEV): Platform {
+  return raw === 'web' || raw === 'crazygames' || raw === 'poki' || raw === 'itch' || raw === 'mock' ? raw : dev ? 'mock' : 'web';
 }
 
 /** `VITE_PLATFORM` picks the provider; anything unknown falls back to mock. */
