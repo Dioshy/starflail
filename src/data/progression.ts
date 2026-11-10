@@ -3,13 +3,14 @@ import type { MetaUnlockDef, PickupDef, ProgressionDef } from './types';
 // Rule cards: xp.md, upgrade-draft.md, stardust.md, meta-unlocks.md. Derivations: balance.md.
 
 export const PROGRESSION: ProgressionDef = {
-  // XP to go from level (i+1) to (i+2). Fitted so a median run levels every ~20-35 s (balance.md section 4).
+  // XP to go from level (i+1) to (i+2). Fitted to the MEASURED competent-bot XP rate (0.83 XP/s at 1-2 min,
+  // ~0.47 XP/s at 3-9 min) so level-ups land every ~20-40 s (balance.md section 4, M1).
   xpForLevel: [
-    10, 18, 28, 40, 54, 70, 85, 100, 115, 130,
-    145, 160, 175, 190, 205, 220, 235, 250, 265, 280,
-    295, 310, 325, 340, 355, 370, 385, 400, 415, 430,
+    5, 9, 12, 14, 16, 17, 18, 19, 20, 21,
+    22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+    32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
   ],
-  xpOverflowStep: 15,
+  xpOverflowStep: 2,
   upgradeChoices: 3,
   rerollsPerRun: 1,
   rarityWeights: { common: 65, rare: 28, epic: 7 },
