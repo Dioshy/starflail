@@ -10,7 +10,7 @@ import { DraftView } from '../ui/draft';
 import { HangarScreen, PauseScreen, ResultsScreen, TitleScreen, stardustParts } from '../ui/screens';
 import { RevivePrompt } from '../ui/adPrompts';
 import { StoreScreen } from '../ui/store';
-import { AdService, SaveEntitlements, createProvider, hasNoAds, isSupporter, platformFromEnv, type MonetizationProvider } from '../monetization';
+import { AdService, SaveEntitlements, createProvider, equipSkuCosmetics, hasNoAds, isSupporter, platformFromEnv, type MonetizationProvider } from '../monetization';
 import { uiRoot } from '../ui/dom';
 import { AD_POLICY, META_UNLOCKS } from '../data';
 import type { ShipSkin, OrbSkin, TrailId } from '../render/art';
@@ -90,6 +90,7 @@ export class Game {
       onAdStart: () => { this.adActive = true; audio.setMuted(true); this.revive.freeze(); },
       onAdEnd: () => { this.adActive = false; audio.setMuted(false); this.stepper.acc = 0; this.input.clearLatches(); this.last = performance.now(); },
     });
+    if (import.meta.env.DEV && params.own) { ents.grant(params.own); equipSkuCosmetics(this.store.data, params.own); this.store.commit(); }
     this.hangar.canStore = this.provider.capabilities.purchases;
     // SDKs load in the background: the game never waits on them. Capabilities update once they are ready.
     void this.provider.init().then(() => { this.hangar.canStore = this.provider.capabilities.purchases; });

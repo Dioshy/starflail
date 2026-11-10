@@ -15,6 +15,8 @@ export interface Params {
   die: number;
   /** dev only: mock ads/checkout complete instantly (screenshots, tests) */
   mockAuto: boolean;
+  /** dev only: grant this SKU (and equip its cosmetics) at startup, e.g. own=supporter_pack */
+  own: string;
   /** dev only: open a level-up draft immediately */
   draft: boolean;
   /** any of seed/skipTo/stress/auto/debug/god given: skip the title and start a run immediately */
@@ -43,6 +45,7 @@ export function parseParams(search: string): Params {
     give: Math.max(0, Math.floor(num('give', 0))),
     die: Math.max(0, num('die', 0)),
     mockAuto: flag('mockAuto'),
+    own: q.get('own') ?? '',
     draft: flag('draft'),
     direct: false,
   };
