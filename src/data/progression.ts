@@ -14,7 +14,7 @@ export const PROGRESSION: ProgressionDef = {
   upgradeChoices: 3,
   rerollsPerRun: 1,
   rarityWeights: { common: 65, rare: 28, epic: 7 },
-  stardust: { perMinuteSurvived: 10, perBossKill: 50, winBonus: 150, perPickup: 5 },
+  stardust: { maxTimeSec: 600, perMinuteSurvived: 10, perBossKill: 50, winBonus: 150, perPickup: 5 },
   fallbackReward: { heal: 1, stardust: 10 },
 };
 

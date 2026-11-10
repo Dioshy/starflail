@@ -83,7 +83,7 @@ describe('director', () => {
     const log: string[] = [];
     for (let i = 0; i < 200; i++) { w.step(idle()); for (const e of evs(w)) if (e.type === 'bossWarn' || e.type === 'bossSpawn') log.push(`${e.type}@${w.time.toFixed(1)}`); }
     expect(log[0]).toMatch(/^bossWarn@178/); expect(log[1]).toMatch(/^bossSpawn@180/);
-    expect(w.activeBoss()!.maxHp).toBe(4000);
+    expect(w.activeBoss()!.maxHp).toBe(3000);
     expect(DIRECTOR.bossWarningSec).toBe(2);
   });
 });

@@ -152,7 +152,7 @@ export interface ProgressionDef {
   upgradeChoices: number;
   rerollsPerRun: number;
   rarityWeights: Record<Rarity, number>;
-  stardust: { perMinuteSurvived: number; perBossKill: number; winBonus: number; perPickup: number };
+  stardust: { maxTimeSec: number; perMinuteSurvived: number; perBossKill: number; winBonus: number; perPickup: number };
   /** offered when fewer than upgradeChoices upgrades are eligible */
   fallbackReward?: { heal: number; stardust: number };
 }
@@ -219,6 +219,13 @@ export interface DirectorDef {
   bossLeaveAfterSec: number;
   overtimeHpMulPer30s: number;
   overtimeSpawnMulPer30s: number;
+  /** Anti-kiting: time spent beyond edgeZoneRadius heats the director (0..1 over edgeHeatSec; cools edgeCoolSec). */
+  edgeZoneRadius: number;
+  edgeHeatSec: number;
+  edgeCoolSec: number;
+  /** At full heat spawns land this close to the ship, and spawn rate is multiplied by edgeSpawnMul. */
+  edgeSpawnDistance: number;
+  edgeSpawnMul: number;
 }
 
 export interface AdPolicyDef {

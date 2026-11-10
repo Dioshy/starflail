@@ -26,3 +26,9 @@ Caveat: on a wide circle (rate <= 0.7, tether taut) an unreeled orb already swin
 
 Competent bot (`tests/competent-bot.test.ts`, 10 seeds, no unlocks): median survival 7:33 (3:23 - 10:43), 0/10 deaths before 3:00,
 so first-120 s data was NOT softened. Level-up gap median 53 s vs the 20-40 s target: kill rate (~0.4/s) lags the modelled XP rate.
+
+## Polish-1 (Gear)
+- Merged Hue's art-readability (t20): telegraphs go through `A.drawTelegraph` (2.5 Hz sine, no 4 Hz toggle for anyone); Reduced Flashes passes `steady` so the pulse holds at mid-brightness while rings/lanes still animate. B6 (Mite vs Dart) fixed by the new silhouettes.
+- `?skipTo=N` is now sliced across frames (40 ms budget) instead of one blocking loop.
+- Warden HP 4000 -> 3000 (bosses.md, balance.md s8).
+- **Open for Sage (M3, novice cliff):** non-dodging play still dies at 0:30-0:60 (idle-circler median 0:48 after the minute-1 spawn -25%); cause is Mite/Dart contact with 5 HP and 1 s i-frames. No HP rule added yet; options: +1 HP on runs 1-2, softer Dart in minute 1, telemetry first.

@@ -186,3 +186,10 @@ been learned. Above 25%, the reel stops mattering (P1). Today: 3 / 790 = **0.4%*
 
 `passiveSwingFloor()` in `balanceModel.ts` encodes this check, and `data.test.ts` asserts that the recommended values pass
 under P2/P3 while today's values fail. Gear swaps in measured speeds when available.
+
+## 8. Polish-1 changes (Gear, from playtest REPORT-1)
+
+- **Anti-kiting (M2).** `DIRECTOR.edge*` (waves.ts): time spent beyond 1150 px from the centre (arena 1600) heats the director 0..1 over 8 s (cools over 4 s). At full heat spawns land 320 px from the ship (instead of 760), spawn rate x2.5 and the alive cap x2. Wall-hugging bot: 10/10 seeds dead by 2:31 (was 3 immortal). Competent bot unchanged (median 9:56, 0/10 deaths before 3:00).
+- **Stardust time cap.** `PROGRESSION.stardust.maxTimeSec = 600`: the per-minute part stops accruing after 10 min, so an AFK run cannot farm.
+- **Minute-1 spawns -25%** (0-30 s 0.8 -> 0.6/s, 30-60 s 1.2 -> 0.9/s). Non-dodging bots only gain ~5 s (idle-circler median 0:43 -> 0:48): the novice cliff (M3) is mostly contact damage, not spawn count. Open for Sage: +1 HP on runs 1-2, or a softer Dart in minute 1.
+- **Bosses (M4), polish-1b.** Warden HP **4000 -> 3000** (leave timer unchanged at 120 s). `playtest/boss2.ts` (competent drafts, boss-orbiting god-mode bot, orbit radius **110 px**): Warden killed on **5/5** seeds (t = 213-260 s, i.e. 33-80 s after spawn), Hive 5/5, Eclipse 5/5 (all 5 runs won). The earlier 0 kills came from the probe orbiting at 230 px, which barely touches a 56 px boss; 4000 HP also passed at 110 px (215-273 s), so 3000 is margin for human play. Without god mode the non-dodging bot dies before the Warden (5/5 dead by ~4 min), so god mode is used.

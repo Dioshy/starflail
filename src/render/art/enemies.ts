@@ -1,5 +1,6 @@
 import { PALETTE, ENEMY_FILL, type EnemyState } from './palette';
 import { drawGlow } from './glow';
+import { pulse01, HIT_FLASH_MAX_ALPHA } from './telegraph';
 
 const TAU = Math.PI * 2;
 
@@ -13,7 +14,7 @@ function paint(ctx: CanvasRenderingContext2D, id: string, col: string, lw: numbe
   ctx.fill();
   ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineJoin = 'round';
   ctx.stroke();
-  if (flash > 0) { ctx.globalAlpha = Math.min(1, flash) * 0.9; ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.globalAlpha = 1; }
+  if (flash > 0) { ctx.globalAlpha = Math.min(1, flash) * HIT_FLASH_MAX_ALPHA; ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.globalAlpha = 1; }
 }
 
 function poly(ctx: CanvasRenderingContext2D, n: number, r: number, rot: number): void {
@@ -31,28 +32,46 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, id: string, x: number, 
   const boss = id === 'warden' || id === 'hive' || id === 'eclipse';
   ctx.save();
   ctx.translate(x, y);
-  drawGlow(ctx, 0, 0, r * (boss ? 2.2 : 2.4), col, tele ? 0.6 : atk ? 0.5 : 0.3);
+  const pu = pulse01(t, x * 0.01);
+  drawGlow(ctx, 0, 0, r * (boss ? 2.2 : 2.4), col, tele ? 0.38 + 0.22 * pu : atk ? 0.5 : 0.3);
+  if (tele && !boss) {
+    // steady non-flashing cue: a breathing warning ring (the world-space charge ring comes from drawTelegraph)
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.globalAlpha = 0.55 + 0.3 * pu;
+    ctx.beginPath(); ctx.arc(0, 0, r * (1.55 + 0.12 * pu), 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
+  }
   ctx.rotate(angle);
   switch (id) {
     case 'mite': {
-      ctx.rotate(Math.sin(t * 18 + x * 0.1) * 0.15);
-      ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r * 0.8, r * 0.75); ctx.lineTo(-r * 0.8, -r * 0.75); ctx.closePath();
-      paint(ctx, id, col, 2, hit);
+      // small, SOLID, round-edged triangle (filled bright body)
+      ctx.rotate(Math.sin(t * 15 + x * 0.1) * 0.15);
+      ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r * 0.8, r * 0.8); ctx.lineTo(-r * 0.8, -r * 0.8); ctx.closePath();
+      ctx.fillStyle = '#b3162d'; ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.stroke();
+      if (hit > 0) { ctx.globalAlpha = Math.min(1, hit) * HIT_FLASH_MAX_ALPHA; ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.globalAlpha = 1; }
       break;
     }
     case 'dart': {
-      const flick = tele && ((t * 16) | 0) % 2 === 0;
-      if (atk) { ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(-r * 3.2, 0); ctx.moveTo(-r * 0.8, r * 0.5); ctx.lineTo(-r * 2.4, r * 0.5); ctx.moveTo(-r * 0.8, -r * 0.5); ctx.lineTo(-r * 2.4, -r * 0.5); ctx.stroke(); ctx.globalAlpha = 1; }
-      const l = atk ? 1.5 : 1.25;
-      ctx.beginPath(); ctx.moveTo(r * l, 0); ctx.lineTo(-r, r * 0.85); ctx.lineTo(-r * 0.35, 0); ctx.lineTo(-r, -r * 0.85); ctx.closePath();
-      paint(ctx, id, flick ? '#ffffff' : col, 2.2, hit + (flick ? 0.7 : 0));
+      // long, thin, HOLLOW arrowhead (~1.6:1) with a tail streak behind it. Always streaks; longer while attacking.
+      const sc = tele ? 1 + 0.07 * pu : 1;
+      ctx.scale(sc, sc);
+      ctx.strokeStyle = col; ctx.lineCap = 'round';
+      ctx.globalAlpha = atk ? 0.7 : 0.45; ctx.lineWidth = 2;
+      const tl = atk ? 3.4 : 2;
+      ctx.beginPath(); ctx.moveTo(-r * 0.9, 0); ctx.lineTo(-r * tl, 0);
+      if (atk) { ctx.moveTo(-r * 0.7, r * 0.45); ctx.lineTo(-r * 2.6, r * 0.45); ctx.moveTo(-r * 0.7, -r * 0.45); ctx.lineTo(-r * 2.6, -r * 0.45); }
+      ctx.stroke(); ctx.globalAlpha = 1;
+      const l = atk ? 1.25 : 1.15;
+      ctx.beginPath(); ctx.moveTo(r * l, 0); ctx.lineTo(-r * 0.8, r * 0.6); ctx.lineTo(-r * 0.35, 0); ctx.lineTo(-r * 0.8, -r * 0.6); ctx.closePath();
+      ctx.fillStyle = '#0b0803'; ctx.fill();
+      ctx.lineWidth = 2.2; ctx.lineJoin = 'round'; ctx.stroke();
+      if (hit > 0) { ctx.globalAlpha = Math.min(1, hit) * HIT_FLASH_MAX_ALPHA; ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.globalAlpha = 1; }
       break;
     }
     case 'wisp': {
-      const fl = hit > 0 ? 1 : 0.55 + 0.45 * Math.sin(t * 31 + x) * Math.sin(t * 17);
-      const rr = r * (tele ? 1 + 0.15 * Math.sin(t * 20) : 1);
+      const fl = hit > 0 ? 1 : 0.8 + 0.2 * Math.sin(t * 9 + x);
+      const rr = r * (tele ? 1 + 0.12 * pu : 1);
       ctx.rotate(t * 2);
-      ctx.globalAlpha = Math.max(0.25, fl);
+      ctx.globalAlpha = Math.max(0.6, fl);
       ctx.strokeStyle = hit > 0 ? '#ffffff' : atk ? '#ffffff' : col; ctx.lineWidth = atk ? 4 : 2.6; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.arc(0, 0, rr, 0.3, 2.3); ctx.stroke();
       ctx.beginPath(); ctx.arc(0, 0, rr, 3.4, 5.4); ctx.stroke();
@@ -63,7 +82,7 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, id: string, x: number, 
     case 'blob':
     case 'blobling': {
       const big = id === 'blob';
-      const amp = (big ? 0.12 : 0.18) * (atk ? 1.8 : 1), sp = tele ? 14 : 5;
+      const amp = (big ? 0.12 : 0.18) * (atk ? 1.8 : 1), sp = tele ? 10 : 5;
       ctx.beginPath();
       for (let i = 0; i <= 10; i++) {
         const a = (i / 10) * TAU, rr = r * (1 + amp * Math.sin(t * sp + i * 1.7));
@@ -77,9 +96,9 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, id: string, x: number, 
     case 'spitter': {
       poly(ctx, 6, r, 0);
       paint(ctx, id, col, 2.4, hit);
-      const open = atk ? 0.75 : tele ? 0.2 + 0.4 * ((Math.sin(t * 14) + 1) / 2) : 0.15;
-      ctx.fillStyle = tele || atk ? '#ffffff' : '#12020c';
-      if (tele || atk) { ctx.globalAlpha = 0.9; }
+      const open = atk ? 0.75 : tele ? 0.2 + 0.4 * pu : 0.15;
+      ctx.fillStyle = atk ? '#ffffff' : tele ? '#ffb3dc' : '#12020c';
+      if (tele) { ctx.globalAlpha = 0.65 + 0.3 * pu; } else if (atk) { ctx.globalAlpha = 0.9; }
       ctx.beginPath(); ctx.moveTo(r * 0.15, 0); ctx.lineTo(r * 0.95, -r * open); ctx.lineTo(r * 0.95, r * open); ctx.closePath(); ctx.fill();
       ctx.globalAlpha = 1;
       break;
@@ -93,14 +112,14 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, id: string, x: number, 
       ctx.fillStyle = col;
       for (const sx of [-1, 1]) for (const sy of [-1, 1]) ctx.fillRect(sx * r * 0.78 - 1.5, sy * r * 0.78 - 1.5, 3, 3);
       if (tele || atk) {
-        ctx.fillStyle = '#ffd0a0'; ctx.globalAlpha = tele ? 0.5 + 0.5 * Math.sin(t * 20) : 1;
+        ctx.fillStyle = '#ffd0a0'; ctx.globalAlpha = tele ? 0.6 + 0.4 * pu : 1;
         ctx.fillRect(r * 0.2, -r * 0.35, r * 0.7, 3); ctx.fillRect(r * 0.2, r * 0.35 - 3, r * 0.7, 3); ctx.globalAlpha = 1;
       }
       break;
     }
     case 'warden': {
       const spin = atk ? 4 : tele ? 0.3 : 0.8;
-      const dist = r * (tele ? 1.35 + 0.08 * Math.sin(t * 16) : 1.15);
+      const dist = r * (tele ? 1.35 + 0.08 * pu : 1.15);
       poly(ctx, 8, r, Math.PI / 8);
       paint(ctx, id, col, 4, hit);
       ctx.lineWidth = 2; ctx.strokeStyle = col; poly(ctx, 8, r * 0.62, Math.PI / 8); ctx.stroke();
@@ -118,12 +137,12 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, id: string, x: number, 
       break;
     }
     case 'hive': {
-      const pulse = 1 + 0.06 * Math.sin(t * (tele ? 14 : 3));
+      const pulse = 1 + 0.06 * (tele ? pu * 2 - 1 : Math.sin(t * 3));
       poly(ctx, 6, r * 0.75 * pulse, 0);
       paint(ctx, id, col, 4, hit);
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * TAU + t * 0.4;
-        const pr = r * (atk ? 0.3 : 0.24) * (tele ? 1 + 0.35 * Math.sin(t * 18 + i) : 1);
+        const pr = r * (atk ? 0.3 : 0.24) * (tele ? 1 + 0.3 * pu : 1);
         const px = Math.cos(a) * r * 0.95, py = Math.sin(a) * r * 0.95;
         ctx.beginPath(); ctx.arc(px, py, pr, 0, TAU);
         ctx.fillStyle = atk || tele ? col : ENEMY_FILL.hive; ctx.fill();
@@ -135,7 +154,7 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, id: string, x: number, 
       break;
     }
     case 'eclipse': {
-      const ex = tele ? 1.12 + 0.06 * Math.sin(t * 16) : atk ? 1.25 : 1.0;
+      const ex = tele ? 1.12 + 0.06 * pu : atk ? 1.25 : 1.0;
       ctx.beginPath(); ctx.arc(0, 0, r * 0.8, 0, TAU);
       paint(ctx, id, col, 4, hit);
       ctx.lineCap = 'round';

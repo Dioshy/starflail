@@ -53,7 +53,7 @@ None found that crash the game or lose data. (Closest: the unmerged pacing branc
 - **B3.** Hangar/store on 1280×720 leave the right 50 % empty (hangar shows a ship preview, store shows nothing). Fine on mobile (single column, 390×844 looks good).
 - **B4. (ethics deviation) "No thanks" smaller than "Watch ad & revive"** (185×55 vs 271×55 px). MONETIZATION.md §2/§3.4 says equal size. *Fix (Hue):* same width/class.
 - **B5.** Telegraph flash toggles at 4 Hz (`render.ts:153`, `floor(t*8)%2`), above the 3 Hz general flash limit, and is not affected by "Reduced flashes". Make it a steady glow or slower pulse when the setting is on.
-- **B6.** Mite and Dart silhouettes are both triangular and red/orange: add a distinguishing mark or colour (Hue).
+- **B6 (FIXED in polish-1, Hue's new silhouettes).** Mite and Dart silhouettes are both triangular and red/orange: add a distinguishing mark or colour (Hue).
 
 ## 4. Headless balance (10 seeds each, first run, no unlocks; `npx vite-node playtest/bots.ts`)
 

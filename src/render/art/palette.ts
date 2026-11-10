@@ -16,7 +16,7 @@ export const PALETTE = {
   text: '#e8f1ff', textDim: '#8fa0cf', danger: '#ff4d5e', warn: '#ffb020', good: '#4dffc4',
   gold: '#ffd166', supporter: '#ffd166',
   enemy: {
-    mite: '#ff4d5e', dart: '#ff8a1f', wisp: '#b36bff', blob: '#a6ff2e', blobling: '#c9ff6b',
+    mite: '#ff3050', dart: '#ffe14d', wisp: '#b36bff', blob: '#a6ff2e', blobling: '#c9ff6b',
     spitter: '#ff3fa4', brute: '#ff5a3a',
   } as Record<EnemyId, string>,
   boss: { warden: '#ff7a1a', hive: '#9dff3a', eclipse: '#c07bff' } as Record<BossId, string>,
@@ -25,7 +25,7 @@ export const PALETTE = {
 };
 
 export const ENEMY_FILL: Record<string, string> = {
-  mite: '#3a0a14', dart: '#3a1a05', wisp: '#1c0b33', blob: '#18300a', blobling: '#1c3a0f',
+  mite: '#3a0a14', dart: '#0b0803', wisp: '#1c0b33', blob: '#18300a', blobling: '#1c3a0f',
   spitter: '#3a0a28', brute: '#2a110c', warden: '#331705', hive: '#18300a', eclipse: '#07030f',
 };
 
