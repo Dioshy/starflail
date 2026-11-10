@@ -96,6 +96,8 @@ export class HangarScreen {
   private store!: SaveStore;
   onLaunch: () => void = () => {};
   onBack: () => void = () => {};
+  onStore: () => void = () => {};
+  canStore = false;
   /** called after any equip/buy so the game can refresh previews */
   onChange: () => void = () => {};
   private onSettings: (s: Settings) => void;
@@ -196,10 +198,13 @@ export class HangarScreen {
       this.body.append(row);
     }
 
-    // STORE-PLACEHOLDER: the Store button (real-money SKUs) is added here by the monetization task. Keep data-slot.
+    // Store button (real-money SKUs live in StoreScreen). Hidden on builds that sell nothing (portals without IAP).
     const storeSlot = h('div', 'store-slot', null, { 'data-slot': 'store-button' });
-    const sb = h('button', 'btn', 'Store · coming soon'); (sb as HTMLButtonElement).disabled = true;
-    storeSlot.append(sb);
+    if (this.canStore) {
+      const sb = h('button', 'btn btn-primary', d.entitlements.includes('supporter') ? '♥ Store' : 'Store', { 'data-act': 'open-store' });
+      sb.addEventListener('click', () => this.onStore());
+      storeSlot.append(sb);
+    }
     this.body.append(storeSlot);
 
     const setBtn = h('button', 'btn', 'Settings');
@@ -221,13 +226,16 @@ export class ResultsScreen {
   private panel = h('div', 'panel results-panel');
   onAgain: () => void = () => {};
   onHangar: () => void = () => {};
+  /** Double Stardust: resolves to the extra stardust banked (0 = ad failed / skipped) */
+  onDouble: () => Promise<number> = () => Promise.resolve(0);
   private raf = 0;
 
   constructor(parent: HTMLElement) { this.el.append(this.panel); parent.append(this.el); }
 
-  show(r: ResultsInfo, store: SaveStore): void {
+  show(r: ResultsInfo, store: SaveStore, opts: { supporter: boolean; offerDouble: boolean } = { supporter: false, offerDouble: false }): void {
     this.el.classList.remove('hidden');
     clear(this.panel);
+    if (opts.supporter) this.panel.append(h('div', 'supporter-chip', '♥ Supporter'));
     this.panel.append(h('h2', r.won ? 'res-title win' : 'res-title', r.won ? 'ECLIPSE DOWN — VICTORY' : 'TETHER SEVERED'));
     if (!r.won && r.killedBy) this.panel.append(h('div', 'res-killed', `Killed by: ${r.killedBy}`));
     const grid = h('div', 'res-grid');
@@ -241,6 +249,19 @@ export class ResultsScreen {
     dust.append(total);
     for (const p of r.parts) if (p.value > 0) dust.append(h('div', 'res-part', `${p.label}  +${p.value}`));
     this.panel.append(dust);
+    let doubleMsg: HTMLElement | null = null;
+    if (opts.offerDouble && r.stardust > 0) {
+      const dbl = h('button', 'btn res-double', `Double stardust (+${r.stardust} ✦) · watch an ad`, { 'data-act': 'double' });
+      doubleMsg = h('div', 'res-ad-msg');
+      dbl.addEventListener('click', () => {
+        (dbl as HTMLButtonElement).disabled = true;
+        void this.onDouble().then((extra) => {
+          if (extra > 0) { dbl.remove(); total.textContent = `✦ +${r.stardust + extra}`; doubleMsg!.textContent = `Doubled! +${extra} ✦ banked.`; r.stardust += extra; }
+          else { doubleMsg!.textContent = 'Ad unavailable. No worries, your stardust is already banked.'; dbl.remove(); }
+        });
+      });
+      this.panel.append(dbl, doubleMsg);
+    }
     const nu = nextUnlock(store.data);
     if (nu) {
       const n = h('div', 'next-unlock');

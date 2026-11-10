@@ -8,9 +8,15 @@ export interface Params {
   stress: number;
   auto: boolean;
   /** start on a menu screen instead of the title (dev/testing) */
-  screen: '' | 'title' | 'hangar' | 'results';
+  screen: '' | 'title' | 'hangar' | 'results' | 'store';
   /** dev only: add stardust to the save */
   give: number;
+  /** dev only: die at this run time (s), to see the Second Wind prompt */
+  die: number;
+  /** dev only: mock ads/checkout complete instantly (screenshots, tests) */
+  mockAuto: boolean;
+  /** dev only: grant this SKU (and equip its cosmetics) at startup, e.g. own=supporter_pack */
+  own: string;
   /** dev only: open a level-up draft immediately */
   draft: boolean;
   /** any of seed/skipTo/stress/auto/debug/god given: skip the title and start a run immediately */
@@ -35,11 +41,14 @@ export function parseParams(search: string): Params {
     speed: Math.min(8, Math.max(0.1, num('speed', 1))),
     stress: Math.min(500, Math.max(0, Math.floor(num('stress', 0)))),
     auto: flag('auto'),
-    screen: screen === 'title' || screen === 'hangar' || screen === 'results' ? screen : '',
+    screen: screen === 'title' || screen === 'hangar' || screen === 'results' || screen === 'store' ? screen : '',
     give: Math.max(0, Math.floor(num('give', 0))),
+    die: Math.max(0, num('die', 0)),
+    mockAuto: flag('mockAuto'),
+    own: q.get('own') ?? '',
     draft: flag('draft'),
     direct: false,
   };
-  p.direct = p.draft || p.seedGiven || p.debug || p.god || p.skipTo > 0 || p.stress > 0 || p.auto;
+  p.direct = p.draft || p.die > 0 || p.seedGiven || p.debug || p.god || p.skipTo > 0 || p.stress > 0 || p.auto;
   return p;
 }

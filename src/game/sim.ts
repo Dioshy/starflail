@@ -927,6 +927,36 @@ export class World {
     }
   }
 
+  /**
+   * Second Wind (design/MONETIZATION.md): undo a death. Full heal, i-frames, and a shockwave that removes non-boss enemies and
+   * projectiles within `clearRadius` of the ship (no XP, no kills counted). Same for every player. Returns false if not dead.
+   */
+  revive(iframesSec: number, clearRadius: number): boolean {
+    if (this.outcome !== 'dead') return false;
+    const s = this.ship;
+    this.outcome = null; this.endTime = 0; this.deadTime = 0; this.killedBy = '';
+    s.hp = s.maxHp; s.iframes = Math.max(s.iframes, iframesSec);
+    this.hurtDmg = 0;
+    const r2 = clearRadius * clearRadius;
+    for (let k = 0; k < this.enemies.count; k++) {
+      const e = this.enemies.items[k];
+      if (e.alive && e.def.ai !== 'boss' && (e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= r2) e.alive = false;
+    }
+    for (let k = 0; k < this.projectiles.count; k++) {
+      const p = this.projectiles.items[k];
+      if (p.alive && (p.x - s.x) ** 2 + (p.y - s.y) ** 2 <= r2) p.alive = false;
+    }
+    this.compact();
+    this.events.push({ type: 'shockwave', x: s.x, y: s.y, r: clearRadius }, { type: 'heal', x: s.x, y: s.y, amount: s.maxHp });
+    return true;
+  }
+
+  /** dev/test: end the run as a death right now */
+  forceDeath(src = 'debug'): void {
+    if (this.outcome) return;
+    this.ship.hp = 0; this.killedBy = src; this.events.push({ type: 'death', x: this.ship.x, y: this.ship.y }); this.finish('dead');
+  }
+
   private finish(o: 'dead' | 'won'): void {
     // a win on the same tick as a death still counts as a win (kills resolve before contact)
     if (this.outcome === 'won') return;

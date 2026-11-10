@@ -8,8 +8,11 @@ import { drawDebug, drawJoystick } from '../ui/touch';
 import { Hud } from '../ui/hud';
 import { DraftView } from '../ui/draft';
 import { HangarScreen, PauseScreen, ResultsScreen, TitleScreen, stardustParts } from '../ui/screens';
+import { RevivePrompt } from '../ui/adPrompts';
+import { StoreScreen } from '../ui/store';
+import { AdService, SaveEntitlements, createProvider, equipSkuCosmetics, hasNoAds, isSupporter, platformFromEnv, type MonetizationProvider } from '../monetization';
 import { uiRoot } from '../ui/dom';
-import { META_UNLOCKS } from '../data';
+import { AD_POLICY, META_UNLOCKS } from '../data';
 import type { ShipSkin, OrbSkin, TrailId } from '../render/art';
 import { botIntents } from './bot';
 import type { Params } from './params';
@@ -18,7 +21,7 @@ import { SaveStore, recordRun, safeStorage, type Settings } from './save';
 import { World } from './sim';
 import type { GameEvent } from './types';
 
-type State = 'title' | 'hangar' | 'run' | 'results';
+type State = 'title' | 'hangar' | 'store' | 'run' | 'results';
 const DEATH_DELAY = 0.85; // s of death cam before results (restart stays well under 2 s)
 const WIN_DELAY = 1.6;
 const DRAFT_DELAY = 0.25; // s of level-up burst before the cards appear
@@ -40,6 +43,12 @@ export class Game {
   private title: TitleScreen;
   private hangar: HangarScreen;
   private results: ResultsScreen;
+  private storeUi: StoreScreen;
+  private revive: RevivePrompt;
+  readonly provider: MonetizationProvider;
+  readonly ads: AdService;
+  private adActive = false;
+  private revivePending = false;
   private stepper = new FixedStepper();
   private last = 0;
   private fps = 60;
@@ -54,6 +63,7 @@ export class Game {
   private unlocked = false;
   private hintT = 0;
   private resultsShown = false;
+  private dieUsed = false;
   private abandoned = false;
   private xpCombo = 0; private xpComboT = 0;
   private hitSfxThisFrame = 0;
@@ -72,6 +82,18 @@ export class Game {
     this.title = new TitleScreen(this.ui, this.store, apply);
     this.hangar = new HangarScreen(this.ui, apply);
     this.results = new ResultsScreen(this.ui);
+    this.storeUi = new StoreScreen(this.ui);
+    this.revive = new RevivePrompt(this.ui);
+    const ents = new SaveEntitlements(this.store, safeStorage());
+    this.provider = createProvider(platformFromEnv(import.meta.env.VITE_PLATFORM), ents, { auto: import.meta.env.DEV && params.mockAuto });
+    this.ads = new AdService(this.provider, { noAds: () => hasNoAds(this.store.data), runsCompleted: () => this.store.data.stats.runs }, {
+      onAdStart: () => { this.adActive = true; audio.setMuted(true); this.revive.freeze(); },
+      onAdEnd: () => { this.adActive = false; audio.setMuted(false); this.stepper.acc = 0; this.input.clearLatches(); this.last = performance.now(); },
+    });
+    if (import.meta.env.DEV && params.own) { ents.grant(params.own); equipSkuCosmetics(this.store.data, params.own); this.store.commit(); }
+    this.hangar.canStore = this.provider.capabilities.purchases;
+    // SDKs load in the background: the game never waits on them. Capabilities update once they are ready.
+    void this.provider.init().then(() => { this.hangar.canStore = this.provider.capabilities.purchases; });
     this.applySettings(this.store.data.settings);
     this.wireUi();
     this.renderer.debug = params.debug;
@@ -112,6 +134,7 @@ export class Game {
     }
 
     if (params.screen === 'hangar') this.goHangar();
+    else if (params.screen === 'store') this.goStore();
     else if (params.screen === 'results') this.demoResults();
     else if (params.direct && params.screen !== 'title') this.startRun();
     else this.goTitle();
@@ -133,7 +156,18 @@ export class Game {
     this.hangar.onBack = () => this.goTitle();
     this.hangar.onLaunch = () => this.startRun();
     this.results.onAgain = () => this.startRun();
-    this.results.onHangar = () => this.goHangar();
+    this.results.onHangar = () => { void this.ads.maybeInterstitial().then(() => this.goHangar()); };
+    this.results.onDouble = async () => {
+      if (!(await this.ads.requestDoubleStardust())) return 0;
+      const extra = Math.floor(this.lastEarned * (AD_POLICY.doubleStardustMul - 1));
+      const d = this.store.data; d.stardust += extra; d.stats.stardustEarned += extra;
+      this.store.commit(); this.store.flush();
+      return extra;
+    };
+    this.hangar.onStore = () => this.goStore();
+    this.storeUi.onBack = () => this.goHangar();
+    this.revive.onYes = () => void this.acceptRevive();
+    this.revive.onNo = () => this.declineRevive();
     this.pauseUi.onResume = () => this.setPaused(false);
     this.pauseUi.onAbandon = () => { this.setPaused(false); this.abandoned = true; this.showResults(); };
     this.draft.onPick = (i) => this.pickDraft(i);
@@ -149,7 +183,7 @@ export class Game {
 
   // ------------------------------------------------------------------ screen flow
   private hideAll(): void {
-    this.title.hide(); this.hangar.hide(); this.results.hide(); this.hud.show(false); this.draft.hide(); this.pauseUi.hide();
+    this.title.hide(); this.hangar.hide(); this.results.hide(); this.hud.show(false); this.draft.hide(); this.pauseUi.hide(); this.storeUi.hide(); this.revive.hide(); this.revivePending = false;
   }
 
   private goTitle(): void {
@@ -169,6 +203,12 @@ export class Game {
     audio.music.stop();
   }
 
+  private goStore(): void {
+    this.hideAll(); this.state = 'store'; this.paused = false;
+    this.storeUi.show(this.store, this.provider);
+    audio.music.stop();
+  }
+
   private demoResults(): void {
     this.world = new World({ seed: this.params.seed, noSpawn: true });
     this.world.time = 187; this.world.kills = 214; this.world.bossKills = 1; this.world.runPickups = 7; this.world.level = 9;
@@ -180,6 +220,7 @@ export class Game {
     const d = this.store.data;
     this.hideAll();
     this.state = 'run'; this.paused = false; this.resultsShown = false; this.abandoned = false;
+    this.ads.beginRun();
     this.runSeed = this.runIndex === 0 ? this.params.seed : (this.runSeed * 1664525 + 1013904223 + this.runIndex) >>> 0;
     this.runIndex++;
     const meta = META_UNLOCKS.filter((m) => d.unlocks.includes(m.id)).map((m) => m.id);
@@ -205,11 +246,15 @@ export class Game {
     this.renderer.reset();
   }
 
+  private lastEarned = 0;
+
   private showResults(): void {
     if (this.resultsShown) return;
     this.resultsShown = true;
+    this.ads.endRun(); this.ads.beginResults();
     const w = this.world, sum = w.summary();
     const earned = w.stardustEarned();
+    this.lastEarned = earned;
     let rec = { newBest: false, banked: 0 };
     if (!this.params.god && this.params.stress === 0 && this.params.skipTo === 0) { // cheat/stress/skip runs never touch the save
       rec = recordRun(this.store.data, { timeSec: sum.secondsSurvived, kills: w.kills, bossKills: w.bossKills, won: sum.won, stardust: earned });
@@ -221,7 +266,36 @@ export class Game {
       won: sum.won, timeSec: sum.secondsSurvived, kills: w.kills, bossKills: w.bossKills, killedBy: w.killedBy, level: w.level,
       parts: stardustParts(sum, w.bonusStardust), stardust: earned, bestSec: this.store.data.bestTimes.survivedSec, newBest: rec.newBest,
       balance: this.store.data.stardust, abandoned: this.abandoned,
-    }, this.store);
+    }, this.store, { supporter: isSupporter(this.store.data), offerDouble: this.ads.canOfferDouble() });
+  }
+
+  // ------------------------------------------------------------------ second wind (once per run)
+  private offerRevive(): boolean {
+    if (this.abandoned || this.world.outcome !== 'dead' || this.params.god) return false;
+    this.ads.pauseForPrompt();
+    const offer = this.ads.secondWindOffer();
+    if (!offer) { this.ads.resumeRun(); return false; }
+    this.revivePending = true;
+    this.revive.show(offer);
+    return true;
+  }
+  private async acceptRevive(): Promise<void> {
+    if (!this.revivePending || this.adActive) return;
+    const ok = await this.ads.requestSecondWind();
+    if (!this.revivePending) return;
+    this.revivePending = false; this.revive.hide();
+    if (ok && this.world.revive(AD_POLICY.secondWindIframesSec, AD_POLICY.secondWindClearRadius)) {
+      this.ads.resumeRun();
+      this.resultsShown = false; this.hitstop = 0; this.slowT = 0;
+      this.stepper.acc = 0; this.input.clearLatches(); this.last = performance.now();
+      audio.music.start(); audio.play('levelUp');
+      this.hud.showBanner('SECOND WIND', 1400);
+    } else this.showResults(); // ad failed / skipped / timed out: progress is never blocked
+  }
+  private declineRevive(): void {
+    if (!this.revivePending) return;
+    this.revivePending = false; this.revive.hide();
+    this.showResults();
   }
 
   setPaused(v: boolean): void {
@@ -278,7 +352,7 @@ export class Game {
       }
       case 'results':
         this.renderer.drawMenu(c, s.w, s.h, real, 'results');
-        if (intents.confirm || this.input.takeReroll()) this.startRun();
+        if ((intents.confirm || this.input.takeReroll()) && !this.adActive) this.startRun();
         break;
       case 'run':
         this.runFrame(c, intents, real, now);
@@ -316,7 +390,7 @@ export class Game {
     }
 
     let alpha = this.stepper.acc / STEP;
-    const live = !this.paused && !this.draft.open;
+    const live = !this.paused && !this.draft.open && !this.revivePending && !this.adActive;
     this.hitSfxThisFrame = 0;
     if (live) {
       this.sinceHitstop += real * 1000;
@@ -342,7 +416,10 @@ export class Game {
       this.intens += (target - this.intens) * Math.min(1, real * 1.5);
       audio.music.setIntensity(this.intens);
       this.renderer.intensity = this.intens;
-      if (w.outcome && !this.resultsShown && w.deadTime >= (w.outcome === 'won' ? WIN_DELAY : DEATH_DELAY)) this.showResults();
+      if (import.meta.env.DEV && this.params.die > 0 && w.time >= this.params.die && !w.outcome && !this.dieUsed) { this.dieUsed = true; w.forceDeath(); }
+      if (w.outcome && !this.resultsShown && w.deadTime >= (w.outcome === 'won' ? WIN_DELAY : DEATH_DELAY)) {
+        if (w.outcome === 'dead' && this.offerRevive()) { /* prompt up; sim frozen */ } else this.showResults();
+      }
     }
     if (!live) this.hud.setHint(null);
     this.renderer.draw(c, w, alpha, live ? real : 0, s.w, s.h);
