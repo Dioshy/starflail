@@ -25,6 +25,10 @@ export class AdService {
   beginRun(): void { this.runActive = true; this.secondWindUsed = false; }
   /** the run is over (death prompt or results): ads become legal */
   endRun(): void { this.runActive = false; this.runsSinceInterstitial++; }
+  /** the death prompt: the one moment a rewarded ad may be requested before the run is over */
+  pauseForPrompt(): void { this.runActive = false; }
+  /** the player was revived: the run is live again, ads are illegal again */
+  resumeRun(): void { this.runActive = true; }
   beginResults(): void { this.doubleUsed = false; this.rewardedThisResults = false; }
   get isRunActive(): boolean { return this.runActive; }
 

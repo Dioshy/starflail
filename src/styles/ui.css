@@ -145,3 +145,30 @@
   .hangar-body { margin-top: max(70px, 18vh); }
   .hud-hint { bottom: 30%; font-size: 17px; }
 }
+
+/* ---------- monetization: store, prompts, mock modals ---------- */
+.store { align-items: stretch; padding-top: max(12px, env(safe-area-inset-top)); }
+.store-body { flex: 1; margin-bottom: 12px; }
+.store-status { min-height: 20px; margin-top: 6px; font: 600 13px var(--font); color: var(--good); text-align: center; width: min(600px, 100%); align-self: center; }
+.hero-card { margin: 12px 0; border-color: var(--gold); --accent: var(--gold); display: flex; flex-direction: column; gap: 8px; }
+.hero-card .card-name { font-size: 22px; }
+.sku { display: flex; flex-direction: column; gap: 8px; }
+.sku-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.sku-item { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--font); padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: rgba(5, 8, 22, .6); }
+.sku-item .dot { width: 10px; height: 10px; border-radius: 50%; }
+.sku-item .dot.none { border: 2px dashed var(--text-dim); }
+.sku-overlap { font: 600 12px var(--font); color: var(--warn); }
+.price-owned { font: 800 13px var(--font); color: var(--good); letter-spacing: .1em; text-transform: uppercase; }
+.supporter-banner { margin: 10px 0 0; padding: 8px 12px; border: 1.5px solid var(--gold); border-radius: 10px; color: var(--gold); font: 700 13px var(--font); background: rgba(255, 209, 102, .08); }
+.supporter-chip { color: var(--gold); font: 800 12px var(--font); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 6px; }
+.revive-panel, .mock-box { text-align: center; max-width: min(460px, 92vw); display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.revive-title, .mock-title { margin: 0; font: 900 24px var(--font); letter-spacing: .18em; }
+.revive-actions, .mock-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.revive-actions .btn { min-width: 170px; }
+.revive-count { font: 800 18px var(--mono); color: var(--text-dim); }
+.mock-modal { z-index: 50; background: rgba(0, 0, 0, .86); }
+.mock-tag { font: 800 11px var(--font); letter-spacing: .14em; color: var(--warn); border: 1px solid var(--warn); border-radius: 6px; padding: 2px 8px; }
+.mock-price { font: 900 34px var(--mono); color: var(--gold); }
+.mock-count { font: 700 16px var(--mono); color: var(--text-dim); }
+.res-double { margin-top: 6px; }
+.res-ad-msg { font: 600 12px var(--font); color: var(--text-dim); min-height: 16px; text-align: center; }
